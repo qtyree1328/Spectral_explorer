@@ -1,0 +1,2199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spectral Reflectance Explorer</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f1117;
+            --bg-card: #1a1d27;
+            --bg-input: #252836;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --yellow: #fbbf24;
+            --green: #22c55e;
+            --red: #ef4444;
+            --orange: #f97316;
+            --text: #f1f5f9;
+            --text-muted: #d5dcf8;
+            --text-dim: #b2c0e0;
+            --border: #383f57;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+        }
+
+        .logo-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .logo h1 { font-size: 1.6rem; font-weight: 600; }
+        .logo p { font-size: 0.95rem; color: var(--text-muted); }
+
+        .file-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .file-controls .image-select,
+        .file-controls .btn {
+            height: 50px;
+        }
+
+        .image-select {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .image-select select {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 0.95rem;
+            cursor: pointer;
+            min-width: 200px;
+            height: 100%;
+        }
+
+        .image-select select:focus { outline: none; }
+
+        .btn {
+            padding: 0 20px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            line-height: 1;
+        }
+
+        .btn:hover { background: var(--bg-card); border-color: var(--accent); }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+
+        .btn-methods {
+            background: #f97316;
+            border-color: #f97316;
+            color: #0f1117;
+        }
+
+        .btn-methods:hover { background: #fb923c; border-color: #fb923c; }
+
+        #fileInput { display: none; }
+
+        /* Control Bar */
+        .control-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-group label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .control-group select {
+            padding: 5px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text);
+            font-size: 0.8rem;
+            cursor: pointer;
+            max-width: 110px;
+        }
+
+        .color-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .color-dot.r { background: #ef4444; }
+        .color-dot.g { background: #22c55e; }
+        .color-dot.b { background: #3b82f6; }
+
+        .slider-group input[type="range"] {
+            width: 60px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: var(--bg-input);
+            border-radius: 2px;
+        }
+
+        .opacity-group {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+        }
+
+        .opacity-group label {
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .opacity-group input[type="range"] {
+            width: 160px;
+        }
+
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            min-width: 26px;
+        }
+
+        .preset-btns { display: flex; gap: 4px; margin-left: auto; }
+
+        .preset-btn {
+            padding: 5px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text);
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .preset-btn:hover { border-color: var(--accent); }
+
+        /* Map Row - Map (80%) + Filters (20%) */
+        .map-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .map-section {
+            flex: 4;
+            min-width: 0;
+            min-height: 520px;
+            height: 580px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            resize: vertical;
+        }
+
+        .filter-section {
+            flex: 1;
+            min-width: 220px;
+            max-width: 280px;
+            min-height: 520px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Map Toolbar */
+        .map-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .tool-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover { border-color: var(--accent); }
+        .tool-btn.active { background: var(--accent); border-color: var(--accent); }
+
+        .tool-separator {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            margin: 0 4px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .toolbar-group label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .map-controls-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            padding: 0 10px;
+            font-weight: 600;
+        }
+
+        .toolbar-group select {
+            padding: 4px 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 0.75rem;
+        }
+
+        /* Map Container - Resizable */
+        .map-container {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #mainCanvas {
+            position: absolute;
+            transform-origin: 0 0;
+        }
+
+        #mainCanvas.pan-mode { cursor: grab; }
+        #mainCanvas.pan-mode:active { cursor: grabbing; }
+        #mainCanvas.sample-mode { cursor: crosshair; }
+
+        #overlayCanvas {
+            position: absolute;
+            transform-origin: 0 0;
+            pointer-events: none;
+        }
+
+        .map-placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        .map-placeholder .icon { font-size: 36px; margin-bottom: 8px; opacity: 0.5; }
+
+        .sample-marker {
+            position: absolute;
+            border: 2px solid var(--yellow);
+            pointer-events: none;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 12px rgba(251, 191, 36, 0.4);
+        }
+
+        .map-info {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            padding: 6px 10px;
+            background: rgba(15, 17, 23, 0.9);
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .map-info .label { color: var(--text-dim); }
+        .map-info .value { color: var(--accent); }
+        .map-info .sample-value { color: var(--yellow); }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            display: flex;
+            gap: 3px;
+        }
+
+        .zoom-btn {
+            width: 28px;
+            height: 28px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .zoom-btn:hover { background: var(--bg-input); }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 17, 23, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-overlay.hidden { display: none; }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--bg-input);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text { margin-top: 10px; color: var(--text-muted); font-size: 0.8rem; }
+
+        /* Filter Panel */
+        .filter-header {
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-header h3 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--yellow);
+        }
+
+        .clear-btn {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            cursor: pointer;
+        }
+
+        .clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+        .filter-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .filter-empty {
+            text-align: center;
+            padding: 20px 10px;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+        }
+
+        .filter-item {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+        .filter-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .filter-band-name {
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-band-name .band-color {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        .filter-remove {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px;
+        }
+
+        .filter-remove:hover { color: var(--red); }
+
+        .range-slider-container {
+            position: relative;
+            height: 24px;
+            margin-bottom: 4px;
+        }
+
+        .range-track {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--bg-dark);
+            border-radius: 2px;
+            transform: translateY(-50%);
+        }
+
+        .range-fill {
+            position: absolute;
+            top: 50%;
+            height: 4px;
+            background: var(--yellow);
+            border-radius: 2px;
+            transform: translateY(-50%);
+        }
+
+        .range-handle {
+            position: absolute;
+            top: 50%;
+            width: 14px;
+            height: 14px;
+            background: var(--yellow);
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            z-index: 2;
+        }
+
+        .range-values {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        .range-values span { color: var(--yellow); }
+
+        .range-domain {
+            display: block;
+            width: 100%;
+            margin-top: 4px;
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .filter-stats {
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--bg-input);
+            border-radius: 6px;
+            font-size: 0.7rem;
+        }
+
+        .filter-stats .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .filter-stats .stat-row:last-child { margin-bottom: 0; }
+        .filter-stats .stat-label { color: var(--text-dim); }
+        .filter-stats .stat-value { color: var(--green); font-family: 'JetBrains Mono', monospace; }
+
+        /* Spectral Section - Below Map */
+        .spectral-section {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .spectral-panel {
+            flex: 3;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 14px;
+            min-height: 340px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .spectral-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .spectral-header h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .spectral-header .subtitle {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        #spectralCanvas {
+            width: 100%;
+            height: 260px;
+            background: var(--bg-input);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .chart-note {
+            margin-top: 6px;
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        .chart-note.good { color: var(--green); }
+        .chart-note.warning { color: var(--orange); }
+
+        /* Band List Panel */
+        .band-panel {
+            flex: 1;
+            min-width: 200px;
+            min-height: 340px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .band-header {
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border-radius: 8px 8px 0 0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .band-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .band-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: var(--bg-input);
+            border-radius: 5px;
+            margin-bottom: 3px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-size: 0.75rem;
+            transition: all 0.15s;
+        }
+
+        .band-item:hover { border-color: var(--border); }
+        .band-item.selected { border-color: var(--yellow); background: rgba(251, 191, 36, 0.1); }
+
+        .band-item .band-info { display: flex; align-items: center; gap: 6px; }
+        .band-item .band-color { width: 6px; height: 16px; border-radius: 2px; }
+        .band-item .band-name { font-weight: 500; font-size: 0.7rem; }
+        .band-item .band-wave { font-size: 0.6rem; color: var(--text-dim); }
+        .band-item .band-value { font-family: 'JetBrains Mono', monospace; color: var(--green); font-size: 0.75rem; }
+
+        /* Data Config - Collapsible */
+        .data-config {
+            margin-top: 24px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .data-config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            cursor: pointer;
+        }
+
+        .data-config-header h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .data-config-content {
+            padding: 12px 14px;
+            display: none;
+        }
+
+        .data-config-content.open { display: block; }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .data-item {
+            background: var(--bg-input);
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .data-item .label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .data-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+        .data-item .value.good { color: var(--green); }
+        .data-item .value.warning { color: var(--orange); }
+
+        .scale-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scale-row label { font-size: 0.75rem; color: var(--text-muted); }
+
+        .scale-row select, .scale-row input {
+            padding: 5px 8px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+
+        .scale-row input { width: 80px; }
+
+        .apply-btn {
+            padding: 5px 12px;
+            background: var(--green);
+            border: none;
+            border-radius: 4px;
+            color: #000;
+            font-weight: 600;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .scaling-info {
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--bg-input);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .scaling-info strong {
+            color: var(--text);
+        }
+
+        .methods-description {
+            margin-bottom: 14px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .methods-description p { margin-bottom: 12px; }
+        .methods-description p:last-child { margin-bottom: 0; }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin: 18px 0 6px;
+        }
+
+        .export-row {
+            margin-top: auto;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .export-btn {
+            width: 100%;
+            padding: 10px 0;
+            border-radius: 6px;
+            border: 1px solid var(--accent);
+            background: transparent;
+            color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .export-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        footer {
+            margin-top: 24px;
+            padding: 16px 0 8px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <img src="favicon.png" alt="Spectral Explorer logo">
+                </div>
+                <div>
+                    <h1>Spectral Reflectance Explorer</h1>
+                    <p>Remote Sensing Educational Tool</p>
+                </div>
+            </div>
+            <div class="file-controls">
+                <div class="image-select">
+                    <label for="cloudImageSelect">Demo Images</label>
+                    <select id="cloudImageSelect">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="loadFileBtn">📁 Load Image</button>
+                <button class="btn btn-methods" id="methodsBtn">📚 Methods</button>
+                <input type="file" id="fileInput" accept=".tif,.tiff">
+            </div>
+        </header>
+
+        <!-- RGB Controls -->
+        <div class="section-title">Visualization Controls</div>
+        <div class="control-bar">
+            <div class="control-group">
+                <span class="color-dot r"></span>
+                <label>R</label>
+                <select id="redBand"></select>
+            </div>
+            <div class="control-group">
+                <span class="color-dot g"></span>
+                <label>G</label>
+                <select id="greenBand"></select>
+            </div>
+            <div class="control-group">
+                <span class="color-dot b"></span>
+                <label>B</label>
+                <select id="blueBand"></select>
+            </div>
+            <div class="control-group slider-group">
+                <label>Stretch</label>
+                <input type="range" id="stretchMin" min="0" max="10" value="2" step="0.5">
+                <span class="slider-value" id="stretchMinVal">2%</span>
+            </div>
+            <div class="control-group slider-group">
+                <label>Gamma</label>
+                <input type="range" id="gamma" min="0.3" max="2.5" value="1" step="0.1">
+                <span class="slider-value" id="gammaVal">1.0</span>
+            </div>
+            <div class="preset-btns">
+                <button class="preset-btn" data-preset="truecolor">True Color</button>
+                <button class="preset-btn" data-preset="falsecolor">False Color</button>
+                <button class="preset-btn" data-preset="agriculture">Agriculture</button>
+            </div>
+        </div>
+
+        <!-- Map Row: Map (80%) + Filters (20%) -->
+        <div class="map-row">
+            <!-- Map Section -->
+            <div class="map-section">
+                <div class="map-toolbar">
+                    <button class="tool-btn active" id="sampleTool" title="Sample Tool">📍</button>
+                    <span class="map-controls-label">Map Controls</span>
+                    <button class="tool-btn" id="panTool" title="Pan Tool">🖐️</button>
+                    <div class="tool-separator"></div>
+                    <button class="tool-btn" id="zoomInBtn" title="Zoom In">+</button>
+                    <button class="tool-btn" id="zoomOutBtn" title="Zoom Out">−</button>
+                    <button class="tool-btn" id="zoomResetBtn" title="Reset">⊡</button>
+                    <div class="toolbar-group">
+                        <label>Window:</label>
+                        <select id="windowSize">
+                            <option value="1">1×1</option>
+                            <option value="5">5×5</option>
+                            <option value="11" selected>11×11</option>
+                            <option value="21">21×21</option>
+                            <option value="51">51×51</option>
+                        </select>
+                    </div>
+                    <div class="opacity-group">
+                        <label>Opacity</label>
+                        <input type="range" id="imageOpacity" min="0" max="1" value="1" step="0.05">
+                        <span class="slider-value" id="imageOpacityVal">100%</span>
+                    </div>
+                </div>
+                <div class="map-container" id="mapContainer">
+                    <div class="map-placeholder" id="mapPlaceholder">
+                        <div class="icon">🌍</div>
+                        <h3>Load an Image</h3>
+                        <p style="font-size: 0.8rem;">Click "Load Image" to select a GeoTIFF file</p>
+                    </div>
+                    <canvas id="mainCanvas"></canvas>
+                    <canvas id="overlayCanvas"></canvas>
+                    <div class="sample-marker" id="sampleMarker" style="display:none;"></div>
+                    <div class="loading-overlay hidden" id="loading">
+                        <div class="spinner"></div>
+                        <div class="loading-text" id="loadingText">Loading...</div>
+                    </div>
+                    <div class="map-info" id="mapInfo" style="display:none;">
+                        <span class="label">Sample:</span> <span class="sample-value" id="samplePos">--</span>
+                        &nbsp;|&nbsp;
+                        <span class="label">Zoom:</span> <span class="value" id="zoomLevel">100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="filter-header">
+                    <h3>🎯 Active Filters</h3>
+                    <button class="clear-btn" id="clearFiltersBtn">Clear</button>
+                </div>
+                <div class="filter-content" id="filterContent">
+                    <div class="filter-empty">
+                        Click bands in the chart below to add reflectance filters
+                    </div>
+                </div>
+                <div class="filter-stats" id="filterStats" style="display:none;">
+                    <div class="stat-row">
+                        <span class="stat-label">Matching:</span>
+                        <span class="stat-value" id="matchingPixels">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Coverage:</span>
+                        <span class="stat-value" id="matchingPercent">--</span>
+                    </div>
+                </div>
+                <div class="export-row">
+                    <button class="export-btn" id="exportBtn">⬇️ Export Report</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spectral Section - Below Map -->
+        <div class="spectral-section">
+            <div class="spectral-panel">
+                <div class="spectral-header">
+                    <div>
+                        <h3>Spectral Signature</h3>
+                        <div class="subtitle">Click bands to add threshold filters</div>
+                    </div>
+                </div>
+                <canvas id="spectralCanvas"></canvas>
+                <div class="chart-note" id="chartNote">Reflectance values (0-1 scale)</div>
+            </div>
+
+            <div class="band-panel">
+                <div class="band-header">Band Values</div>
+                <div class="band-list" id="bandList"></div>
+            </div>
+        </div>
+
+        <!-- Methods Panel -->
+        <div class="data-config" id="dataConfig">
+            <div class="data-config-header" id="dataConfigHeader">
+                <h3>🧪 Methods Panel</h3>
+                <span style="color: var(--text-dim); font-size: 10px;">▼</span>
+            </div>
+            <div class="data-config-content" id="dataConfigContent">
+                <div class="methods-description">
+                    <p>Spectral Reflectance Explorer is a teaching tool for investigating multispectral GeoTIFF data. Each pixel is scaled from digital numbers (DN) into unitless reflectance using the scale factor reported by the sensor, then rendered as RGB composites and spectral signatures that can be compared across windows.</p>
+                    <p>When a TIFF is loaded, every band is read with geotiff.js, normalized by the selected divisor, and cached as float arrays. Visualization panels sample a configurable spatial window, summarize per-band statistics, and power band-specific filters so you can design logic-based queries that highlight materials of interest.</p>
+                    <p>The analytics below expose the assumptions made by the rendering pipeline and the parameters used to transform raw values into the on-screen visualizations.</p>
+                </div>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="label">Raw Range</div>
+                        <div class="value" id="rawRange">--</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">Data Type</div>
+                        <div class="value" id="dataType">--</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">Scaled Range</div>
+                        <div class="value" id="scaledRange">--</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">Status</div>
+                        <div class="value" id="scaleStatus">--</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">Scale Factor</div>
+                        <div class="value" id="scaleFactorValue">--</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">Sample Format</div>
+                        <div class="value" id="sampleFormat">--</div>
+                    </div>
+                </div>
+                <div class="scale-row">
+                    <label>Scale (÷):</label>
+                    <select id="scalePreset">
+                        <option value="auto">Auto</option>
+                        <option value="1">1</option>
+                        <option value="255">255</option>
+                        <option value="10000">10,000</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <input type="number" id="customScale" value="10000" style="display:none;">
+                    <button class="apply-btn" id="applyScaleBtn">Apply</button>
+                </div>
+                <div class="scaling-info">
+                    <p><strong>Conversion:</strong> Reflectance (rho) = DN ÷ <span id="scaleFactorDetail">--</span></p>
+                    <p><strong>Calibrated Range:</strong> <span id="reflectanceRange">--</span> (unitless surface reflectance)</p>
+                    <p><strong>Precision:</strong> 1 DN ≈ <span id="precisionInfo">--</span> reflectance units</p>
+                </div>
+            </div>
+        </div>
+        <footer>
+            Quintin Tyree | <a href="mailto:tyreespatial@gmail.com">tyreespatial@gmail.com</a>
+        </footer>
+    </div>
+
+    <script>
+        const KNOWN_BANDS = {
+            8: [
+                { name: 'Coastal Blue', center: 442, color: '#6366f1' },
+                { name: 'Blue', center: 490, color: '#3b82f6' },
+                { name: 'Green I', center: 531, color: '#22c55e' },
+                { name: 'Green', center: 565, color: '#84cc16' },
+                { name: 'Yellow', center: 610, color: '#eab308' },
+                { name: 'Red', center: 665, color: '#ef4444' },
+                { name: 'Red Edge', center: 705, color: '#dc2626' },
+                { name: 'NIR', center: 865, color: '#991b1b' }
+            ],
+            4: [
+                { name: 'Blue', center: 485, color: '#3b82f6' },
+                { name: 'Green', center: 560, color: '#22c55e' },
+                { name: 'Red', center: 660, color: '#ef4444' },
+                { name: 'NIR', center: 830, color: '#991b1b' }
+            ]
+        };
+
+        const GCS_BUCKET = 'general_research_bucket';
+        const GCS_PREFIX = 'Spectral_app_images/';
+        const GCS_LIST_ENDPOINT = `https://storage.googleapis.com/storage/v1/b/${GCS_BUCKET}/o?prefix=${encodeURIComponent(GCS_PREFIX)}`;
+        const GCS_PUBLIC_BASE = `https://storage.googleapis.com/${GCS_BUCKET}/`;
+
+        const state = {
+            rawRasterData: null,
+            rasterData: null,
+            width: 0,
+            height: 0,
+            bandCount: 0,
+            bandInfo: [],
+            rawMin: 0,
+            rawMax: 0,
+            dataType: '',
+            scaleFactor: 10000,
+            redBand: 0,
+            greenBand: 0,
+            blueBand: 0,
+            stretchMin: 2,
+            gamma: 1.0,
+            imageOpacity: 1,
+            zoom: 1,
+            panX: 0,
+            panY: 0,
+            isPanning: false,
+            panStartX: 0,
+            panStartY: 0,
+            tool: 'sample',
+            sampleX: null,
+            sampleY: null,
+            windowSize: 11,
+            currentReflectance: [],
+            thresholds: {},
+            bandPositions: [],
+            bandStats: [],
+            cloudImageList: [],
+            sampleFormat: '',
+            currentImageLabel: 'N/A'
+        };
+
+        const el = {
+            mainCanvas: document.getElementById('mainCanvas'),
+            overlayCanvas: document.getElementById('overlayCanvas'),
+            spectralCanvas: document.getElementById('spectralCanvas'),
+            mapContainer: document.getElementById('mapContainer'),
+            mapPlaceholder: document.getElementById('mapPlaceholder'),
+            loading: document.getElementById('loading'),
+            loadingText: document.getElementById('loadingText'),
+            mapInfo: document.getElementById('mapInfo'),
+            sampleMarker: document.getElementById('sampleMarker'),
+            samplePos: document.getElementById('samplePos'),
+            zoomLevel: document.getElementById('zoomLevel'),
+            dataConfig: document.getElementById('dataConfig'),
+            dataConfigContent: document.getElementById('dataConfigContent'),
+            rawRange: document.getElementById('rawRange'),
+            dataType: document.getElementById('dataType'),
+            scaledRange: document.getElementById('scaledRange'),
+            scaleStatus: document.getElementById('scaleStatus'),
+            scaleFactorValue: document.getElementById('scaleFactorValue'),
+            sampleFormat: document.getElementById('sampleFormat'),
+            scaleFactorDetail: document.getElementById('scaleFactorDetail'),
+            reflectanceRange: document.getElementById('reflectanceRange'),
+            precisionInfo: document.getElementById('precisionInfo'),
+            scalePreset: document.getElementById('scalePreset'),
+            customScale: document.getElementById('customScale'),
+            redBand: document.getElementById('redBand'),
+            greenBand: document.getElementById('greenBand'),
+            blueBand: document.getElementById('blueBand'),
+            stretchMin: document.getElementById('stretchMin'),
+            stretchMinVal: document.getElementById('stretchMinVal'),
+            gamma: document.getElementById('gamma'),
+            gammaVal: document.getElementById('gammaVal'),
+            imageOpacity: document.getElementById('imageOpacity'),
+            imageOpacityVal: document.getElementById('imageOpacityVal'),
+            windowSize: document.getElementById('windowSize'),
+            bandList: document.getElementById('bandList'),
+            filterContent: document.getElementById('filterContent'),
+            filterStats: document.getElementById('filterStats'),
+            matchingPixels: document.getElementById('matchingPixels'),
+            matchingPercent: document.getElementById('matchingPercent'),
+            chartNote: document.getElementById('chartNote'),
+            sampleTool: document.getElementById('sampleTool'),
+            panTool: document.getElementById('panTool'),
+            cloudImageSelect: document.getElementById('cloudImageSelect'),
+            methodsBtn: document.getElementById('methodsBtn'),
+            exportBtn: document.getElementById('exportBtn')
+        };
+
+        // Tool selection
+        el.sampleTool.addEventListener('click', () => {
+            state.tool = 'sample';
+            el.sampleTool.classList.add('active');
+            el.panTool.classList.remove('active');
+            el.mainCanvas.className = 'sample-mode';
+        });
+
+        el.panTool.addEventListener('click', () => {
+            state.tool = 'pan';
+            el.panTool.classList.add('active');
+            el.sampleTool.classList.remove('active');
+            el.mainCanvas.className = 'pan-mode';
+        });
+
+        if (el.methodsBtn) {
+            el.methodsBtn.addEventListener('click', () => {
+                el.dataConfigContent.classList.add('open');
+                el.dataConfig.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        if (el.exportBtn) {
+            el.exportBtn.addEventListener('click', () => {
+                exportReport();
+            });
+        }
+
+        document.getElementById('dataConfigHeader').addEventListener('click', () => {
+            el.dataConfigContent.classList.toggle('open');
+        });
+
+        if (el.cloudImageSelect) {
+            el.cloudImageSelect.addEventListener('change', e => {
+                if (!e.target.value) return;
+                loadCloudImage(e.target.value);
+            });
+        }
+
+        async function initCloudImageList() {
+            if (!el.cloudImageSelect) return;
+            try {
+                el.cloudImageSelect.innerHTML = '<option value=\"\">Loading...</option>';
+                const objects = await fetchAllCloudObjects();
+                if (objects.length === 0) {
+                    el.cloudImageSelect.innerHTML = '<option value=\"\">No cloud images</option>';
+                    return;
+                }
+                state.cloudImageList = objects;
+                populateCloudImageSelect(objects);
+                el.cloudImageSelect.value = objects[0];
+                await loadCloudImage(objects[0]);
+            } catch (err) {
+                console.error('Cloud list error:', err);
+                el.cloudImageSelect.innerHTML = '<option value=\"\">Cloud load failed</option>';
+            }
+        }
+
+        async function fetchAllCloudObjects() {
+            let pageToken = '';
+            const results = [];
+            do {
+                const url = pageToken ? `${GCS_LIST_ENDPOINT}&pageToken=${encodeURIComponent(pageToken)}` : GCS_LIST_ENDPOINT;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error(`Failed to fetch cloud list (${resp.status})`);
+                const data = await resp.json();
+                const items = (data.items || []).map(obj => obj.name).filter(name => {
+                    if (!name) return false;
+                    if (!name.toLowerCase().endsWith('.tif') && !name.toLowerCase().endsWith('.tiff')) return false;
+                    return name.startsWith(GCS_PREFIX);
+                });
+                results.push(...items);
+                pageToken = data.nextPageToken || '';
+            } while (pageToken);
+            return results;
+        }
+
+        function populateCloudImageSelect(objects) {
+            const options = objects.map(name => {
+                const label = formatCloudLabel(name);
+                return `<option value=\"${name}\">${label}</option>`;
+            });
+            el.cloudImageSelect.innerHTML = options.join('');
+        }
+
+        function formatCloudLabel(fullPath) {
+            const trimmed = fullPath.startsWith(GCS_PREFIX) ? fullPath.slice(GCS_PREFIX.length) : fullPath;
+            return trimmed.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ');
+        }
+
+        // File loading
+        document.getElementById('loadFileBtn').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) await loadFromFile(file);
+        });
+
+        async function loadFromFile(file) {
+            el.loading.classList.remove('hidden');
+            el.loadingText.textContent = 'Reading file...';
+            try {
+                const buffer = await file.arrayBuffer();
+                await processGeoTIFF(buffer, file.name);
+            } catch (err) {
+                console.error(err);
+                el.loadingText.textContent = `Error: ${err.message}`;
+                setTimeout(() => el.loading.classList.add('hidden'), 3000);
+            }
+        }
+
+        async function loadImageFromPath(relativePath, labelOverride = null) {
+            el.loading.classList.remove('hidden');
+            el.loadingText.textContent = 'Loading image...';
+            try {
+                const response = await fetch(relativePath);
+                if (!response.ok) throw new Error(`Unable to fetch ${relativePath}`);
+                const buffer = await response.arrayBuffer();
+                const rawName = relativePath.split('/').pop() || 'Image';
+                let cleanName = rawName.split('?')[0];
+                try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+                const label = labelOverride || cleanName;
+                await processGeoTIFF(buffer, label);
+            } catch (err) {
+                console.error(err);
+                el.loadingText.textContent = `Error: ${err.message}`;
+                setTimeout(() => el.loading.classList.add('hidden'), 3000);
+            }
+        }
+
+        async function loadCloudImage(objectName) {
+            const encodedPath = encodeGcsPath(objectName);
+            const url = `${GCS_PUBLIC_BASE}${encodedPath}`;
+            const label = formatCloudLabel(objectName);
+            await loadImageFromPath(url, label);
+        }
+
+        function encodeGcsPath(path) {
+            return path.split('/').map(encodeURIComponent).join('/');
+        }
+
+        function exportReport() {
+            if (!state.rasterData) {
+                alert('Load an image before exporting.');
+                return;
+            }
+            const now = new Date();
+            const lines = [];
+            lines.push('Spectral Reflectance Explorer Report');
+            lines.push(`Generated: ${now.toISOString()}`);
+            lines.push(`Image: ${state.currentImageLabel}`);
+            lines.push(`Dimensions: ${state.width} × ${state.height}`);
+            lines.push(`Sample Position: ${state.sampleX !== null ? state.sampleX + ', ' + state.sampleY : 'N/A'}`);
+            lines.push(`Window Size: ${state.windowSize} × ${state.windowSize}`);
+            lines.push(`Scale Factor: ${state.scaleFactor}`);
+            lines.push(`Raw DN Range: ${state.rawMin.toFixed(0)} – ${state.rawMax.toFixed(0)}`);
+            lines.push(`Scaled Range: ${(state.rawMin / state.scaleFactor).toFixed(4)} – ${(state.rawMax / state.scaleFactor).toFixed(4)}`);
+            lines.push('');
+            lines.push('Spectral Values (current window):');
+            state.currentReflectance.forEach((val, idx) => {
+                const band = state.bandInfo[idx];
+                lines.push(`- ${band.name} (${band.center}nm): ${val.toFixed(6)}`);
+            });
+            lines.push('');
+            lines.push('Active Filters:');
+            const thresholdBands = Object.keys(state.thresholds);
+            if (thresholdBands.length === 0) {
+                lines.push('- None');
+            } else {
+                thresholdBands.forEach(key => {
+                    const idx = Number(key);
+                    const band = state.bandInfo[idx];
+                    const t = state.thresholds[idx];
+                    lines.push(`- ${band.name} (${band.center}nm): ${t.min.toFixed(4)} – ${t.max.toFixed(4)}`);
+                });
+            }
+            lines.push('');
+            lines.push('Methods:');
+            lines.push(`- GeoTIFF parsed in-browser via geotiff.js at native ${state.width}×${state.height} resolution without resampling.`);
+            lines.push(`- Raw digital numbers converted to surface reflectance using ρ = DN ÷ ${state.scaleFactor}.`);
+            lines.push(`- Visualization stretch uses ${state.stretchMin}% low clip, 98% high clip, and gamma ${state.gamma.toFixed(2)} for the selected RGB bands.`);
+            lines.push('- Spectral signatures computed by averaging each band within the specified sampling window, and filter thresholds operate on these scaled reflectance values.');
+            lines.push('- Highlight overlays show pixels whose per-band reflectance falls within every active threshold.');
+            const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `spectral_report_${now.getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function processGeoTIFF(buffer, label = 'Image') {
+            el.loadingText.textContent = 'Parsing GeoTIFF...';
+
+            const tiff = await GeoTIFF.fromArrayBuffer(buffer);
+            const image = await tiff.getImage();
+
+            state.currentImageLabel = label;
+            state.width = image.getWidth();
+            state.height = image.getHeight();
+            state.bandCount = image.getSamplesPerPixel();
+            
+            const bitsPerSample = image.getBitsPerSample();
+            const sampleFormat = image.getSampleFormat();
+            state.dataType = `${bitsPerSample[0]}-bit`;
+            state.sampleFormat = formatSampleFormat(sampleFormat ? sampleFormat[0] : null);
+
+            el.loadingText.textContent = `Reading ${state.bandCount} bands...`;
+
+            const rasters = await image.readRasters();
+            
+            state.rawRasterData = [];
+            state.rawMin = Infinity;
+            state.rawMax = -Infinity;
+            
+            for (let i = 0; i < state.bandCount; i++) {
+                state.rawRasterData.push(rasters[i]);
+                for (let j = 0; j < rasters[i].length; j++) {
+                    const v = rasters[i][j];
+                    if (v < state.rawMin) state.rawMin = v;
+                    if (v > state.rawMax) state.rawMax = v;
+                }
+            }
+
+            state.scaleFactor = autoDetectScaleFactor(state.rawMax);
+            applyScaleFactor(state.scaleFactor);
+
+            setupBandInfo();
+            setupBandSelectors();
+            setDefaultBands();
+            updateDataInfoPanel();
+            resetView();
+            resetSamplePosition();
+            state.thresholds = {};
+            state.imageOpacity = 1;
+            if (el.imageOpacity) el.imageOpacity.value = '1';
+            updateImageOpacity();
+
+            renderImage();
+            updateAnalysis();
+
+            el.mapPlaceholder.style.display = 'none';
+            el.mapInfo.style.display = 'block';
+            el.dataConfig.classList.add('visible');
+            el.loading.classList.add('hidden');
+            el.mainCanvas.className = state.tool === 'pan' ? 'pan-mode' : 'sample-mode';
+        }
+
+        function autoDetectScaleFactor(maxVal) {
+            if (maxVal <= 1.5) return 1;
+            if (maxVal <= 255) return 255;
+            if (maxVal <= 1000) return 1000;
+            if (maxVal <= 10000) return 10000;
+            if (maxVal <= 20000) return 20000;
+            return maxVal;
+        }
+
+        function applyScaleFactor(factor) {
+            state.scaleFactor = factor;
+            state.rasterData = [];
+            
+            for (let i = 0; i < state.bandCount; i++) {
+                const raw = state.rawRasterData[i];
+                const scaled = new Float32Array(raw.length);
+                for (let j = 0; j < raw.length; j++) {
+                    scaled[j] = raw[j] / factor;
+                }
+                state.rasterData.push(scaled);
+            }
+            computeBandStats();
+            
+            updateDataInfoPanel();
+        }
+
+        function computeBandStats() {
+            state.bandStats = state.rasterData.map(band => {
+                let min = Infinity;
+                let max = -Infinity;
+                for (let i = 0; i < band.length; i++) {
+                    const val = band[i];
+                    if (val < min) min = val;
+                    if (val > max) max = val;
+                }
+                if (!Number.isFinite(min)) min = 0;
+                if (!Number.isFinite(max)) max = 0;
+                return { min, max };
+            });
+        }
+
+        function getBandStats(index) {
+            return state.bandStats[index] || { min: 0, max: 1 };
+        }
+
+        function clampToBandRange(index, value) {
+            const stats = getBandStats(index);
+            const min = stats.min;
+            const max = stats.max;
+            if (max === min) return min;
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function valueToPercent(value, stats) {
+            const range = stats.max - stats.min;
+            if (range === 0) return 0;
+            return ((value - stats.min) / range) * 100;
+        }
+
+        function clampPercent(pct) {
+            return Math.max(0, Math.min(100, pct));
+        }
+
+        function updateDataInfoPanel() {
+            el.rawRange.textContent = `${state.rawMin.toFixed(0)} – ${state.rawMax.toFixed(0)}`;
+            el.dataType.textContent = state.dataType;
+            
+            const scaledMin = state.rawMin / state.scaleFactor;
+            const scaledMax = state.rawMax / state.scaleFactor;
+            const scaledRangeText = `${scaledMin.toFixed(3)} – ${scaledMax.toFixed(3)}`;
+            el.scaledRange.textContent = scaledRangeText;
+            el.scaleFactorValue.textContent = state.scaleFactor.toLocaleString();
+            el.sampleFormat.textContent = state.sampleFormat || 'Unknown';
+            el.scaleFactorDetail.textContent = state.scaleFactor.toLocaleString();
+            el.reflectanceRange.textContent = scaledRangeText;
+            const precision = state.scaleFactor !== 0 ? 1 / state.scaleFactor : 0;
+            el.precisionInfo.textContent = precision ? precision.toExponential(2) : '—';
+            
+            if (scaledMax > 0 && scaledMax <= 1.5) {
+                el.scaleStatus.textContent = '✓ Good';
+                el.scaleStatus.className = 'value good';
+                el.chartNote.textContent = '✓ Reflectance in 0-1 range';
+                el.chartNote.className = 'chart-note good';
+            } else {
+                el.scaleStatus.textContent = '⚠ Check';
+                el.scaleStatus.className = 'value warning';
+                el.chartNote.textContent = '⚠ Adjust scale factor';
+                el.chartNote.className = 'chart-note warning';
+            }
+        }
+
+        el.scalePreset.addEventListener('change', (e) => {
+            el.customScale.style.display = e.target.value === 'custom' ? 'inline-block' : 'none';
+        });
+
+        document.getElementById('applyScaleBtn').addEventListener('click', () => {
+            let newScale;
+            if (el.scalePreset.value === 'auto') {
+                newScale = autoDetectScaleFactor(state.rawMax);
+            } else if (el.scalePreset.value === 'custom') {
+                newScale = parseFloat(el.customScale.value) || 10000;
+            } else {
+                newScale = parseFloat(el.scalePreset.value);
+            }
+            applyScaleFactor(newScale);
+            renderImage();
+            updateAnalysis();
+        });
+
+        function setupBandInfo() {
+            if (KNOWN_BANDS[state.bandCount]) {
+                state.bandInfo = KNOWN_BANDS[state.bandCount].map((b, i) => ({ ...b, index: i }));
+            } else {
+                const isHyper = state.bandCount > 20;
+                state.bandInfo = Array.from({ length: state.bandCount }, (_, i) => {
+                    const center = 400 + (i / Math.max(1, state.bandCount - 1)) * (isHyper ? 2100 : 500);
+                    return {
+                        name: isHyper ? `${Math.round(center)}nm` : `Band ${i + 1}`,
+                        center: Math.round(center),
+                        color: wavelengthToColor(center),
+                        index: i
+                    };
+                });
+            }
+        }
+
+        function formatSampleFormat(code) {
+            const formats = {
+                1: 'Unsigned Integer',
+                2: 'Signed Integer',
+                3: 'Floating Point'
+            };
+            return formats[code] || 'Unknown';
+        }
+
+        function wavelengthToColor(wl) {
+            if (wl < 440) return '#8b5cf6';
+            if (wl < 490) return '#3b82f6';
+            if (wl < 510) return '#06b6d4';
+            if (wl < 580) return '#22c55e';
+            if (wl < 600) return '#eab308';
+            if (wl < 650) return '#f97316';
+            if (wl < 700) return '#ef4444';
+            if (wl < 800) return '#dc2626';
+            return '#991b1b';
+        }
+
+        function setupBandSelectors() {
+            const opts = state.bandInfo.map((b, i) => `<option value="${i}">${b.name}</option>`).join('');
+            el.redBand.innerHTML = opts;
+            el.greenBand.innerHTML = opts;
+            el.blueBand.innerHTML = opts;
+        }
+
+        function setDefaultBands() {
+            if (state.bandCount === 8) {
+                state.redBand = 5; state.greenBand = 3; state.blueBand = 1;
+            } else if (state.bandCount === 4) {
+                state.redBand = 2; state.greenBand = 1; state.blueBand = 0;
+            } else {
+                state.redBand = Math.min(2, state.bandCount - 1);
+                state.greenBand = Math.min(1, state.bandCount - 1);
+                state.blueBand = 0;
+            }
+            el.redBand.value = state.redBand;
+            el.greenBand.value = state.greenBand;
+            el.blueBand.value = state.blueBand;
+        }
+
+        function renderImage() {
+            if (!state.rasterData) return;
+
+            const ctx = el.mainCanvas.getContext('2d');
+            el.mainCanvas.width = state.width;
+            el.mainCanvas.height = state.height;
+            el.overlayCanvas.width = state.width;
+            el.overlayCanvas.height = state.height;
+
+            const getStretch = (band) => {
+                const sorted = Float32Array.from(state.rasterData[band]).sort((a, b) => a - b);
+                return {
+                    min: sorted[Math.floor(sorted.length * state.stretchMin / 100)],
+                    max: sorted[Math.floor(sorted.length * 0.98)]
+                };
+            };
+
+            const rS = getStretch(state.redBand);
+            const gS = getStretch(state.greenBand);
+            const bS = getStretch(state.blueBand);
+
+            const imgData = ctx.createImageData(state.width, state.height);
+
+            for (let i = 0; i < state.width * state.height; i++) {
+                imgData.data[i * 4] = stretch(state.rasterData[state.redBand][i], rS);
+                imgData.data[i * 4 + 1] = stretch(state.rasterData[state.greenBand][i], gS);
+                imgData.data[i * 4 + 2] = stretch(state.rasterData[state.blueBand][i], bS);
+                imgData.data[i * 4 + 3] = 255;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            applyThresholdHighlight();
+            updateCanvasTransform();
+            updateSampleMarker();
+        }
+
+        function stretch(v, s) {
+            let n = (v - s.min) / (s.max - s.min + 0.0001);
+            n = Math.max(0, Math.min(1, n));
+            n = Math.pow(n, 1 / state.gamma);
+            return Math.round(n * 255);
+        }
+
+        function updateCanvasTransform() {
+            const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+            el.mainCanvas.style.transform = transform;
+            el.overlayCanvas.style.transform = transform;
+            el.zoomLevel.textContent = Math.round(state.zoom * 100) + '%';
+        }
+
+        function updateImageOpacity() {
+            if (el.imageOpacityVal) {
+                el.imageOpacityVal.textContent = Math.round(state.imageOpacity * 100) + '%';
+            }
+            el.mainCanvas.style.opacity = state.imageOpacity;
+        }
+
+        function resetView() {
+            const container = el.mapContainer.getBoundingClientRect();
+            const scaleX = container.width / state.width;
+            const scaleY = container.height / state.height;
+            state.zoom = Math.min(scaleX, scaleY, 1);
+            state.panX = (container.width - state.width * state.zoom) / 2;
+            state.panY = (container.height - state.height * state.zoom) / 2;
+            updateCanvasTransform();
+        }
+
+        function resetSamplePosition() {
+            state.sampleX = Math.floor(state.width / 2);
+            state.sampleY = Math.floor(state.height / 2);
+            el.samplePos.textContent = `${state.sampleX}, ${state.sampleY}`;
+        }
+
+        function updateSampleMarker() {
+            if (state.sampleX === null) return;
+            const hs = Math.floor(state.windowSize / 2);
+            const x = state.panX + (state.sampleX - hs) * state.zoom;
+            const y = state.panY + (state.sampleY - hs) * state.zoom;
+            const size = state.windowSize * state.zoom;
+            el.sampleMarker.style.display = 'block';
+            el.sampleMarker.style.left = x + 'px';
+            el.sampleMarker.style.top = y + 'px';
+            el.sampleMarker.style.width = size + 'px';
+            el.sampleMarker.style.height = size + 'px';
+        }
+
+        // Controls
+        el.redBand.addEventListener('change', e => { state.redBand = +e.target.value; renderImage(); });
+        el.greenBand.addEventListener('change', e => { state.greenBand = +e.target.value; renderImage(); });
+        el.blueBand.addEventListener('change', e => { state.blueBand = +e.target.value; renderImage(); });
+
+        el.stretchMin.addEventListener('input', e => {
+            state.stretchMin = +e.target.value;
+            el.stretchMinVal.textContent = state.stretchMin + '%';
+            renderImage();
+        });
+
+        el.gamma.addEventListener('input', e => {
+            state.gamma = +e.target.value;
+            el.gammaVal.textContent = state.gamma.toFixed(1);
+            renderImage();
+        });
+
+        if (el.imageOpacity) {
+            el.imageOpacity.addEventListener('input', e => {
+                state.imageOpacity = +e.target.value;
+                updateImageOpacity();
+            });
+        }
+
+        el.windowSize.addEventListener('change', e => {
+            state.windowSize = +e.target.value;
+            updateSampleMarker();
+            updateAnalysis();
+        });
+
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const presets = {
+                    truecolor: { r: 'Red', g: 'Green', b: 'Blue' },
+                    falsecolor: { r: 'NIR', g: 'Red', b: 'Green' },
+                    agriculture: { r: 'NIR', g: 'Red Edge', b: 'Red' }
+                };
+                const p = presets[btn.dataset.preset];
+                if (p) {
+                    const find = name => state.bandInfo.findIndex(b => b.name.toLowerCase().includes(name.toLowerCase()));
+                    const r = find(p.r), g = find(p.g), b = find(p.b);
+                    if (r >= 0) state.redBand = r;
+                    if (g >= 0) state.greenBand = g;
+                    if (b >= 0) state.blueBand = b;
+                    el.redBand.value = state.redBand;
+                    el.greenBand.value = state.greenBand;
+                    el.blueBand.value = state.blueBand;
+                    renderImage();
+                }
+            });
+        });
+
+        // Zoom controls
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            state.zoom = Math.min(state.zoom * 1.5, 10);
+            updateCanvasTransform();
+            updateSampleMarker();
+        });
+
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            state.zoom = Math.max(state.zoom / 1.5, 0.1);
+            updateCanvasTransform();
+            updateSampleMarker();
+        });
+
+        document.getElementById('zoomResetBtn').addEventListener('click', () => {
+            resetView();
+            updateSampleMarker();
+        });
+
+        el.mapContainer.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect = el.mapContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const oldZoom = state.zoom;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            state.zoom = Math.max(0.1, Math.min(10, state.zoom * delta));
+            state.panX = mouseX - (mouseX - state.panX) * (state.zoom / oldZoom);
+            state.panY = mouseY - (mouseY - state.panY) * (state.zoom / oldZoom);
+            updateCanvasTransform();
+            updateSampleMarker();
+        });
+
+        // Mouse interactions
+        el.mainCanvas.addEventListener('mousedown', e => {
+            if (!state.rasterData) return;
+            if (state.tool === 'pan') {
+                state.isPanning = true;
+                state.panStartX = e.clientX - state.panX;
+                state.panStartY = e.clientY - state.panY;
+                e.preventDefault();
+            }
+        });
+
+        el.mainCanvas.addEventListener('mousemove', e => {
+            if (state.isPanning) {
+                state.panX = e.clientX - state.panStartX;
+                state.panY = e.clientY - state.panStartY;
+                updateCanvasTransform();
+                updateSampleMarker();
+            }
+        });
+
+        window.addEventListener('mouseup', () => { state.isPanning = false; });
+
+        el.mainCanvas.addEventListener('click', e => {
+            if (!state.rasterData || state.isPanning) return;
+            if (state.tool !== 'sample') return;
+
+            const rect = el.mainCanvas.getBoundingClientRect();
+            state.sampleX = Math.floor((e.clientX - rect.left) / state.zoom);
+            state.sampleY = Math.floor((e.clientY - rect.top) / state.zoom);
+            state.sampleX = Math.max(0, Math.min(state.width - 1, state.sampleX));
+            state.sampleY = Math.max(0, Math.min(state.height - 1, state.sampleY));
+            el.samplePos.textContent = `${state.sampleX}, ${state.sampleY}`;
+            updateSampleMarker();
+            updateAnalysis();
+        });
+
+        // Analysis
+        function updateAnalysis() {
+            if (!state.rasterData || state.sampleX === null) return;
+            state.currentReflectance = sampleReflectance(state.sampleX, state.sampleY, state.windowSize);
+            updateBandList();
+            drawSpectralChart();
+        }
+
+        function sampleReflectance(cx, cy, size) {
+            const hs = Math.floor(size / 2);
+            const values = [];
+            for (let b = 0; b < state.bandCount; b++) {
+                let sum = 0, cnt = 0;
+                for (let dy = -hs; dy <= hs; dy++) {
+                    for (let dx = -hs; dx <= hs; dx++) {
+                        const x = cx + dx, y = cy + dy;
+                        if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
+                            sum += state.rasterData[b][y * state.width + x];
+                            cnt++;
+                        }
+                    }
+                }
+                values.push(cnt > 0 ? sum / cnt : 0);
+            }
+            return values;
+        }
+
+        function updateBandList() {
+            el.bandList.innerHTML = state.currentReflectance.map((v, i) => {
+                const isSelected = state.thresholds.hasOwnProperty(i);
+                const b = state.bandInfo[i];
+                return `
+                    <div class="band-item ${isSelected ? 'selected' : ''}" data-band="${i}">
+                        <div class="band-info">
+                            <div class="band-color" style="background: ${b.color}"></div>
+                            <div>
+                                <div class="band-name">${b.name}</div>
+                                <div class="band-wave">${b.center}nm</div>
+                            </div>
+                        </div>
+                        <div class="band-value">${v.toFixed(4)}</div>
+                    </div>
+                `;
+            }).join('');
+
+            el.bandList.querySelectorAll('.band-item').forEach(item => {
+                item.addEventListener('click', () => toggleBandThreshold(+item.dataset.band));
+            });
+        }
+
+        // Spectral Chart
+        function drawSpectralChart() {
+            const canvas = el.spectralCanvas;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const W = rect.width, H = rect.height;
+            const pad = { top: 20, right: 15, bottom: 35, left: 45 };
+            const cW = W - pad.left - pad.right;
+            const cH = H - pad.top - pad.bottom;
+
+            ctx.fillStyle = '#252836';
+            ctx.fillRect(0, 0, W, H);
+
+            if (!state.currentReflectance.length) return;
+
+            const finiteValues = state.currentReflectance.filter(v => Number.isFinite(v));
+            const safeValues = finiteValues.length ? finiteValues : [0];
+            const rawMin = Math.min(...safeValues);
+            const rawMax = Math.max(...safeValues);
+            const baseRange = rawMax - rawMin || Math.max(Math.abs(rawMax), 0.05) * 0.2 || 0.1;
+            const padding = baseRange * 0.15;
+            let yMin = rawMin - padding;
+            let yMax = rawMax + padding;
+            if (yMax - yMin < 0.01) {
+                const mid = (yMax + yMin) / 2;
+                yMin = mid - 0.05;
+                yMax = mid + 0.05;
+            }
+            const yScale = v => {
+                const normalized = (v - yMin) / (yMax - yMin);
+                return pad.top + cH - Math.max(0, Math.min(1, normalized)) * cH;
+            };
+
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.top + cH * i / 4;
+                ctx.beginPath();
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(W - pad.right, y);
+                ctx.stroke();
+            }
+
+            // Y labels
+            ctx.fillStyle = '#64748b';
+            ctx.font = '9px JetBrains Mono';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 4; i++) {
+                const labelVal = yMax - (yMax - yMin) * (i / 4);
+                ctx.fillText(labelVal.toFixed(2), pad.left - 5, pad.top + cH * i / 4 + 3);
+            }
+
+            const barWidth = cW / state.bandCount;
+            state.bandPositions = state.bandInfo.map((_, i) => ({
+                x: pad.left + i * barWidth,
+                width: barWidth,
+                index: i
+            }));
+
+            // Bars
+            state.currentReflectance.forEach((val, i) => {
+                const x = pad.left + i * barWidth + 2;
+                const bw = barWidth - 4;
+                const normalized = (val - yMin) / (yMax - yMin);
+                const barH = Math.max(0, Math.min(1, normalized)) * cH;
+                const y = pad.top + cH - barH;
+                const isSelected = state.thresholds.hasOwnProperty(i);
+
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(251, 191, 36, 0.15)';
+                    ctx.fillRect(pad.left + i * barWidth, pad.top, barWidth, cH);
+                }
+
+                const barColor = isSelected ? '#fbbf24' : state.bandInfo[i].color;
+                ctx.save();
+                ctx.globalAlpha = 0.85;
+                ctx.fillStyle = barColor;
+                ctx.fillRect(x, y, bw, barH);
+                ctx.restore();
+
+                ctx.strokeStyle = barColor;
+                ctx.lineWidth = isSelected ? 2 : 1;
+                ctx.strokeRect(x, y, bw, barH);
+
+                ctx.fillStyle = '#f1f5f9';
+                ctx.font = 'bold 8px JetBrains Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(val.toFixed(3), pad.left + (i + 0.5) * barWidth, y - 3);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '7px Inter';
+                ctx.fillText(state.bandInfo[i].name.substring(0, 5), pad.left + (i + 0.5) * barWidth, H - pad.bottom + 10);
+            });
+
+            // Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            state.currentReflectance.forEach((val, i) => {
+                const x = pad.left + (i + 0.5) * barWidth;
+                const y = yScale(val);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Y axis label
+            ctx.save();
+            ctx.translate(10, H / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillStyle = '#64748b';
+            ctx.font = '9px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText('Reflectance', 0, 0);
+            ctx.restore();
+        }
+
+        el.spectralCanvas.addEventListener('click', e => {
+            if (!state.bandPositions.length) return;
+            const rect = el.spectralCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+
+            for (const pos of state.bandPositions) {
+                if (x >= pos.x && x < pos.x + pos.width) {
+                    toggleBandThreshold(pos.index);
+                    break;
+                }
+            }
+        });
+
+        // Thresholding
+        function toggleBandThreshold(bandIndex) {
+            if (state.thresholds.hasOwnProperty(bandIndex)) {
+                delete state.thresholds[bandIndex];
+            } else {
+                const val = state.currentReflectance[bandIndex];
+                const stats = getBandStats(bandIndex);
+                const span = Math.max((stats.max - stats.min) * 0.05, 0.005);
+                const minVal = clampToBandRange(bandIndex, val - span);
+                const maxVal = clampToBandRange(bandIndex, val + span);
+                state.thresholds[bandIndex] = {
+                    min: minVal,
+                    max: maxVal > minVal ? maxVal : clampToBandRange(bandIndex, minVal + span)
+                };
+            }
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        }
+
+        function updateFilterPanel() {
+            const bands = Object.keys(state.thresholds).map(Number);
+
+            if (bands.length === 0) {
+                el.filterContent.innerHTML = '<div class="filter-empty">Click bands in the chart below to add reflectance filters</div>';
+                el.filterStats.style.display = 'none';
+                return;
+            }
+
+            el.filterStats.style.display = 'block';
+
+            el.filterContent.innerHTML = bands.map(i => {
+                const t = state.thresholds[i];
+                const b = state.bandInfo[i];
+                const stats = getBandStats(i);
+                const minPct = clampPercent(valueToPercent(t.min, stats));
+                const maxPct = clampPercent(valueToPercent(t.max, stats));
+                const fillWidth = Math.max(maxPct - minPct, 0);
+                return `
+                    <div class="filter-item">
+                        <div class="filter-item-header">
+                            <div class="filter-band-name">
+                                <div class="band-color" style="background: ${b.color}"></div>
+                                ${b.name}
+                            </div>
+                            <button class="filter-remove" data-band="${i}">×</button>
+                        </div>
+                        <div class="range-slider-container" data-band="${i}">
+                            <div class="range-track"></div>
+                            <div class="range-fill" style="left: ${minPct}%; width: ${fillWidth}%"></div>
+                            <div class="range-handle min" style="left: ${minPct}%"></div>
+                            <div class="range-handle max" style="left: ${maxPct}%"></div>
+                        </div>
+                        <div class="range-values">
+                            <div>Min: <span class="range-min">${t.min.toFixed(4)}</span></div>
+                            <div>Max: <span class="range-max">${t.max.toFixed(4)}</span></div>
+                            <span class="range-domain">Band range ${stats.min.toFixed(4)} – ${stats.max.toFixed(4)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            el.filterContent.querySelectorAll('.filter-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    delete state.thresholds[+btn.dataset.band];
+                    updateFilterPanel();
+                    updateBandList();
+                    drawSpectralChart();
+                    applyThresholdHighlight();
+                });
+            });
+
+            el.filterContent.querySelectorAll('.range-slider-container').forEach(container => {
+                const bandIdx = +container.dataset.band;
+                const minHandle = container.querySelector('.range-handle.min');
+                const maxHandle = container.querySelector('.range-handle.max');
+
+                const updateSlider = () => {
+                    const t = state.thresholds[bandIdx];
+                    const stats = getBandStats(bandIdx);
+                    const minPct = clampPercent(valueToPercent(t.min, stats));
+                    const maxPct = clampPercent(valueToPercent(t.max, stats));
+                    const fill = container.querySelector('.range-fill');
+                    fill.style.left = minPct + '%';
+                    fill.style.width = Math.max(maxPct - minPct, 0) + '%';
+                    minHandle.style.left = minPct + '%';
+                    maxHandle.style.left = maxPct + '%';
+                    const valuesEl = container.parentElement.querySelector('.range-values');
+                    if (valuesEl) {
+                        const minSpan = valuesEl.querySelector('.range-min');
+                        const maxSpan = valuesEl.querySelector('.range-max');
+                        if (minSpan) minSpan.textContent = t.min.toFixed(4);
+                        if (maxSpan) maxSpan.textContent = t.max.toFixed(4);
+                        const domain = valuesEl.querySelector('.range-domain');
+                        if (domain) domain.textContent = `Band range ${stats.min.toFixed(4)} – ${stats.max.toFixed(4)}`;
+                    }
+                };
+
+                const startDrag = (handle, isMin) => {
+                    const onMove = e => {
+                        const rect = container.getBoundingClientRect();
+                        let pct = (e.clientX - rect.left) / rect.width;
+                        pct = Math.max(0, Math.min(1, pct));
+                        const stats = getBandStats(bandIdx);
+                        const range = stats.max - stats.min;
+                        if (range <= 0) {
+                            state.thresholds[bandIdx].min = stats.min;
+                            state.thresholds[bandIdx].max = stats.max;
+                            updateSlider();
+                            return;
+                        }
+                        const value = stats.min + pct * range;
+                        const epsilon = Math.max(range * 0.002, 1e-6);
+                        if (isMin) {
+                            const maxAllowed = state.thresholds[bandIdx].max - epsilon;
+                            state.thresholds[bandIdx].min = clampToBandRange(bandIdx, Math.min(value, maxAllowed));
+                        } else {
+                            const minAllowed = state.thresholds[bandIdx].min + epsilon;
+                            state.thresholds[bandIdx].max = clampToBandRange(bandIdx, Math.max(value, minAllowed));
+                        }
+                        updateSlider();
+                        applyThresholdHighlight();
+                    };
+                    const onUp = () => {
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('mouseup', onUp);
+                    };
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onUp);
+                };
+
+                minHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(minHandle, true); });
+                maxHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(maxHandle, false); });
+            });
+        }
+
+        function applyThresholdHighlight() {
+            const ctx = el.overlayCanvas.getContext('2d');
+            ctx.clearRect(0, 0, el.overlayCanvas.width, el.overlayCanvas.height);
+
+            const bands = Object.keys(state.thresholds).map(Number);
+            if (bands.length === 0) {
+                el.matchingPixels.textContent = '--';
+                el.matchingPercent.textContent = '--';
+                return;
+            }
+
+            const imgData = ctx.createImageData(state.width, state.height);
+            let matchCount = 0;
+            const totalPixels = state.width * state.height;
+
+            for (let i = 0; i < totalPixels; i++) {
+                let matches = true;
+                for (const bandIdx of bands) {
+                    const val = state.rasterData[bandIdx][i];
+                    const t = state.thresholds[bandIdx];
+                    if (val < t.min || val > t.max) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    imgData.data[i * 4] = 251;
+                    imgData.data[i * 4 + 1] = 191;
+                    imgData.data[i * 4 + 2] = 36;
+                    imgData.data[i * 4 + 3] = 180;
+                    matchCount++;
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            el.matchingPixels.textContent = matchCount.toLocaleString();
+            el.matchingPercent.textContent = ((matchCount / totalPixels) * 100).toFixed(2) + '%';
+        }
+
+        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+            state.thresholds = {};
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        });
+
+        // Resize handling
+        window.addEventListener('resize', () => {
+            if (state.rasterData) {
+                updateSampleMarker();
+                drawSpectralChart();
+            }
+        });
+
+        updateImageOpacity();
+        initCloudImageList();
+    </script>
+</body>
+</html>
