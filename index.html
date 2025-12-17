@@ -476,6 +476,64 @@
             padding: 10px;
         }
 
+        .filter-selection {
+            background: rgba(37, 40, 54, 0.85);
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-instructions {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 0 0 10px 0;
+            line-height: 1.4;
+        }
+
+        .filter-options {
+            margin-top: 8px;
+        }
+
+        .filter-active-header {
+            background: rgba(37, 40, 54, 0.85);
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .filter-custom-prompt {
+            background: rgba(37, 40, 54, 0.6);
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-custom-prompt p {
+            font-size: 0.75rem;
+            color: var(--accent);
+            margin: 0;
+            text-align: center;
+        }
+
+        .preset-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .preset-button {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .preset-button:hover {
+            border-color: var(--accent);
+        }
+
         .filter-empty {
             text-align: center;
             padding: 20px 10px;
@@ -568,17 +626,26 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.65rem;
             color: var(--text-muted);
+            gap: 10px;
         }
 
-        .range-values span { color: var(--yellow); }
+        .range-values label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            color: var(--text-muted);
+            font-family: inherit;
+        }
 
-        .range-domain {
-            display: block;
-            width: 100%;
-            margin-top: 4px;
-            font-size: 0.6rem;
-            color: var(--text-dim);
-            font-family: 'Inter', sans-serif;
+        .range-input {
+            width: 110px;
+            padding: 4px 6px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
         }
 
         .filter-stats {
@@ -972,7 +1039,13 @@
             <!-- Filter Section -->
             <div class="filter-section">
                 <div class="filter-header">
-                    <h3>🎯 Active Filters</h3>
+                    <h3>🧾 Threshold Filters</h3>
+                </div>
+                <div class="filter-selection" id="filterSelection">
+                    <p class="filter-instructions">Filtering spectral bands by thresholds allows you to isolate reflectance patterns and reveal features in the image. Try it yourself or choose a preset filter.</p>
+                    <div class="filter-options" id="filterOptions"></div>
+                </div>
+                <div class="filter-active-header" id="filterActiveHeader" style="display:none;">
                     <button class="clear-btn" id="clearFiltersBtn">Clear</button>
                 </div>
                 <div class="filter-content" id="filterContent">
@@ -988,6 +1061,11 @@
                     <div class="stat-row">
                         <span class="stat-label">Coverage:</span>
                         <span class="stat-value" id="matchingPercent">--</span>
+                    </div>
+                    <div class="stat-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                        <span class="stat-label">Mask Opacity:</span>
+                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="flex: 1;">
+                        <span class="stat-value" id="maskOpacityVal" style="min-width: 35px;">70%</span>
                     </div>
                 </div>
                 <div class="export-row">
@@ -1097,6 +1175,27 @@
             ]
         };
 
+        const PRESET_FILTERS = [
+            {
+                id: 'water',
+                name: 'Water',
+                description: 'General water signature preset',
+                entries: [
+                    { match: 'Blue', center: 490, min: 0.0051, max: 0.0932 },
+                    { match: 'Red Edge', center: 705, min: 0.0049, max: 0.0483 }
+                ]
+            },
+            {
+                id: 'vegetation',
+                name: 'Vegetation',
+                description: 'Healthy vegetation reflectance preset',
+                entries: [
+                    { match: 'Red', center: 665, min: 0.0200, max: 0.1500 },
+                    { match: 'NIR', center: 865, min: 0.1800, max: 0.7200 }
+                ]
+            }
+        ];
+
         const GCS_BUCKET = 'general_research_bucket';
         const GCS_PREFIX = 'Spectral_app_images/';
         const GCS_LIST_ENDPOINT = `https://storage.googleapis.com/storage/v1/b/${GCS_BUCKET}/o?prefix=${encodeURIComponent(GCS_PREFIX)}`;
@@ -1119,6 +1218,7 @@
             stretchMin: 2,
             gamma: 1.0,
             imageOpacity: 1,
+            maskOpacity: 0.7,
             zoom: 1,
             panX: 0,
             panY: 0,
@@ -1135,7 +1235,8 @@
             bandStats: [],
             cloudImageList: [],
             sampleFormat: '',
-            currentImageLabel: 'N/A'
+            currentImageLabel: 'N/A',
+            filterMode: 'custom'
         };
 
         const el = {
@@ -1172,12 +1273,18 @@
             gammaVal: document.getElementById('gammaVal'),
             imageOpacity: document.getElementById('imageOpacity'),
             imageOpacityVal: document.getElementById('imageOpacityVal'),
+            maskOpacity: document.getElementById('maskOpacity'),
+            maskOpacityVal: document.getElementById('maskOpacityVal'),
             windowSize: document.getElementById('windowSize'),
             bandList: document.getElementById('bandList'),
             filterContent: document.getElementById('filterContent'),
             filterStats: document.getElementById('filterStats'),
             matchingPixels: document.getElementById('matchingPixels'),
             matchingPercent: document.getElementById('matchingPercent'),
+            filterSelection: document.getElementById('filterSelection'),
+            filterOptions: document.getElementById('filterOptions'),
+            filterActiveHeader: document.getElementById('filterActiveHeader'),
+            filterCustomPrompt: document.getElementById('filterCustomPrompt'),
             chartNote: document.getElementById('chartNote'),
             sampleTool: document.getElementById('sampleTool'),
             panTool: document.getElementById('panTool'),
@@ -1213,6 +1320,9 @@
                 exportReport();
             });
         }
+
+        // Initialize filter options
+        renderFilterOptions();
 
         document.getElementById('dataConfigHeader').addEventListener('click', () => {
             el.dataConfigContent.classList.toggle('open');
@@ -1327,6 +1437,105 @@
 
         function encodeGcsPath(path) {
             return path.split('/').map(encodeURIComponent).join('/');
+        }
+
+        function renderFilterOptions() {
+            if (!el.filterOptions) return;
+
+            // Create custom button
+            const customBtn = document.createElement('button');
+            customBtn.className = 'preset-button';
+            customBtn.textContent = 'Custom';
+            customBtn.style.fontWeight = 'bold';
+            customBtn.addEventListener('click', () => {
+                selectFilterMode('custom');
+            });
+
+            // Create preset buttons
+            const presetButtons = PRESET_FILTERS.map(preset => {
+                const btn = document.createElement('button');
+                btn.className = 'preset-button';
+                btn.dataset.preset = preset.id;
+                btn.innerHTML = `
+                    <strong>${preset.name}</strong><br>
+                    <span style="font-size:0.7rem;color:var(--text-dim)">${preset.description}</span>
+                `;
+                btn.addEventListener('click', () => {
+                    selectFilterMode('preset');
+                    applyPresetFilters(preset.id);
+                });
+                return btn;
+            });
+
+            const container = document.createElement('div');
+            container.className = 'preset-buttons';
+            container.appendChild(customBtn);
+            presetButtons.forEach(btn => container.appendChild(btn));
+
+            el.filterOptions.innerHTML = '';
+            el.filterOptions.appendChild(container);
+        }
+
+        function selectFilterMode(mode) {
+            state.filterMode = mode;
+
+            // Hide selection UI, show active header with clear button
+            el.filterSelection.style.display = 'none';
+            el.filterActiveHeader.style.display = 'block';
+
+            // Show custom prompt only for custom mode
+            if (el.filterCustomPrompt) {
+                if (mode === 'custom') {
+                    el.filterCustomPrompt.style.display = 'block';
+                } else {
+                    el.filterCustomPrompt.style.display = 'none';
+                }
+            }
+        }
+
+        function resetFilterUI() {
+            // Show selection UI again, hide active header
+            el.filterSelection.style.display = 'block';
+            el.filterActiveHeader.style.display = 'none';
+            if (el.filterCustomPrompt) {
+                el.filterCustomPrompt.style.display = 'none';
+            }
+            state.filterMode = 'custom';
+        }
+
+        function applyPresetFilters(presetId) {
+            const preset = PRESET_FILTERS.find(p => p.id === presetId);
+            if (!preset) return;
+            if (!state.bandInfo.length) {
+                alert('Load an image before applying presets.');
+                return;
+            }
+            const newThresholds = {};
+            preset.entries.forEach(entry => {
+                const idx = findBandIndexForPreset(entry);
+                if (idx >= 0) {
+                    newThresholds[idx] = {
+                        min: clampToBandRange(idx, entry.min),
+                        max: clampToBandRange(idx, entry.max)
+                    };
+                }
+            });
+            if (Object.keys(newThresholds).length === 0) {
+                alert('Preset bands not available in this image.');
+                return;
+            }
+            state.thresholds = newThresholds;
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        }
+
+        function findBandIndexForPreset(entry) {
+            const byName = state.bandInfo.findIndex(b => b.name.toLowerCase().includes(entry.match.toLowerCase()));
+            if (byName >= 0) return byName;
+            const byCenter = state.bandInfo.findIndex(b => Math.abs(b.center - entry.center) <= 5);
+            return byCenter;
         }
 
         function exportReport() {
@@ -1694,6 +1903,15 @@
             el.sampleMarker.style.height = size + 'px';
         }
 
+        // Debounce helper for smooth slider updates
+        let sliderDebounceTimer = null;
+        function debounceRender(delay = 300) {
+            if (sliderDebounceTimer) clearTimeout(sliderDebounceTimer);
+            sliderDebounceTimer = setTimeout(() => {
+                renderImage();
+            }, delay);
+        }
+
         // Controls
         el.redBand.addEventListener('change', e => { state.redBand = +e.target.value; renderImage(); });
         el.greenBand.addEventListener('change', e => { state.greenBand = +e.target.value; renderImage(); });
@@ -1702,19 +1920,27 @@
         el.stretchMin.addEventListener('input', e => {
             state.stretchMin = +e.target.value;
             el.stretchMinVal.textContent = state.stretchMin + '%';
-            renderImage();
+            debounceRender();
         });
 
         el.gamma.addEventListener('input', e => {
             state.gamma = +e.target.value;
             el.gammaVal.textContent = state.gamma.toFixed(1);
-            renderImage();
+            debounceRender();
         });
 
         if (el.imageOpacity) {
             el.imageOpacity.addEventListener('input', e => {
                 state.imageOpacity = +e.target.value;
                 updateImageOpacity();
+            });
+        }
+
+        if (el.maskOpacity) {
+            el.maskOpacity.addEventListener('input', e => {
+                state.maskOpacity = +e.target.value;
+                el.maskOpacityVal.textContent = Math.round(state.maskOpacity * 100) + '%';
+                applyThresholdHighlight();
             });
         }
 
@@ -2002,17 +2228,16 @@
 
         // Thresholding
         function toggleBandThreshold(bandIndex) {
+            // Automatically enter custom mode when clicking a band
+            selectFilterMode('custom');
+
             if (state.thresholds.hasOwnProperty(bandIndex)) {
                 delete state.thresholds[bandIndex];
             } else {
-                const val = state.currentReflectance[bandIndex];
                 const stats = getBandStats(bandIndex);
-                const span = Math.max((stats.max - stats.min) * 0.05, 0.005);
-                const minVal = clampToBandRange(bandIndex, val - span);
-                const maxVal = clampToBandRange(bandIndex, val + span);
                 state.thresholds[bandIndex] = {
-                    min: minVal,
-                    max: maxVal > minVal ? maxVal : clampToBandRange(bandIndex, minVal + span)
+                    min: stats.min,
+                    max: stats.max
                 };
             }
             updateFilterPanel();
@@ -2055,9 +2280,8 @@
                             <div class="range-handle max" style="left: ${maxPct}%"></div>
                         </div>
                         <div class="range-values">
-                            <div>Min: <span class="range-min">${t.min.toFixed(4)}</span></div>
-                            <div>Max: <span class="range-max">${t.max.toFixed(4)}</span></div>
-                            <span class="range-domain">Band range ${stats.min.toFixed(4)} – ${stats.max.toFixed(4)}</span>
+                            <label>Min<input type="number" class="range-input range-input-min" value="${t.min.toFixed(4)}" step="0.0001"></label>
+                            <label>Max<input type="number" class="range-input range-input-max" value="${t.max.toFixed(4)}" step="0.0001"></label>
                         </div>
                     </div>
                 `;
@@ -2090,12 +2314,10 @@
                     maxHandle.style.left = maxPct + '%';
                     const valuesEl = container.parentElement.querySelector('.range-values');
                     if (valuesEl) {
-                        const minSpan = valuesEl.querySelector('.range-min');
-                        const maxSpan = valuesEl.querySelector('.range-max');
-                        if (minSpan) minSpan.textContent = t.min.toFixed(4);
-                        if (maxSpan) maxSpan.textContent = t.max.toFixed(4);
-                        const domain = valuesEl.querySelector('.range-domain');
-                        if (domain) domain.textContent = `Band range ${stats.min.toFixed(4)} – ${stats.max.toFixed(4)}`;
+                        const minInput = valuesEl.querySelector('.range-input-min');
+                        const maxInput = valuesEl.querySelector('.range-input-max');
+                        if (minInput) minInput.value = t.min.toFixed(4);
+                        if (maxInput) maxInput.value = t.max.toFixed(4);
                     }
                 };
 
@@ -2134,6 +2356,34 @@
 
                 minHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(minHandle, true); });
                 maxHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(maxHandle, false); });
+
+                const handleInputChange = (inputEl, isMin) => {
+                    inputEl.addEventListener('change', () => {
+                        let val = parseFloat(inputEl.value);
+                        if (!Number.isFinite(val)) return;
+                        const stats = getBandStats(bandIdx);
+                        const range = stats.max - stats.min;
+                        const epsilon = Math.max(range * 0.002, 1e-6);
+                        val = clampToBandRange(bandIdx, val);
+                        if (isMin) {
+                            const maxAllowed = state.thresholds[bandIdx].max - epsilon;
+                            state.thresholds[bandIdx].min = Math.min(val, maxAllowed);
+                        } else {
+                            const minAllowed = state.thresholds[bandIdx].min + epsilon;
+                            state.thresholds[bandIdx].max = Math.max(val, minAllowed);
+                        }
+                        updateSlider();
+                        applyThresholdHighlight();
+                    });
+                };
+
+                const valuesEl = container.parentElement.querySelector('.range-values');
+                if (valuesEl) {
+                    const minInput = valuesEl.querySelector('.range-input-min');
+                    const maxInput = valuesEl.querySelector('.range-input-max');
+                    if (minInput) handleInputChange(minInput, true);
+                    if (maxInput) handleInputChange(maxInput, false);
+                }
             });
         }
 
@@ -2166,7 +2416,7 @@
                     imgData.data[i * 4] = 251;
                     imgData.data[i * 4 + 1] = 191;
                     imgData.data[i * 4 + 2] = 36;
-                    imgData.data[i * 4 + 3] = 180;
+                    imgData.data[i * 4 + 3] = Math.round(state.maskOpacity * 255);
                     matchCount++;
                 }
             }
@@ -2178,6 +2428,7 @@
 
         document.getElementById('clearFiltersBtn').addEventListener('click', () => {
             state.thresholds = {};
+            resetFilterUI();
             updateFilterPanel();
             updateBandList();
             drawSpectralChart();
