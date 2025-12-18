@@ -292,6 +292,8 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
         }
 
         /* Map Toolbar */
@@ -469,18 +471,53 @@
 
         /* Filter Panel */
         .filter-header {
-            padding: 10px 12px;
-            background: var(--bg-input);
+            padding: 10px 10px 0 10px;
+            background: var(--bg-card);
             border-bottom: 1px solid var(--border);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 10px;
         }
 
-        .filter-header h3 {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--yellow);
+        .filter-tabs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .filter-tab {
+            padding: 8px 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+
+        .filter-tab:hover { color: var(--text); }
+
+        .filter-tab.active {
+            color: var(--text);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        .filter-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 2px 10px;
+            gap: 8px;
         }
 
         .clear-btn {
@@ -494,6 +531,13 @@
         }
 
         .clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+        .filter-body {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
 
         .filter-content {
             flex: 1;
@@ -735,6 +779,90 @@
         .filter-stats .stat-row:last-child { margin-bottom: 0; }
         .filter-stats .stat-label { color: var(--text-dim); }
         .filter-stats .stat-value { color: var(--green); font-family: 'JetBrains Mono', monospace; }
+
+        /* Index tab */
+        .indices-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+        }
+
+        .indices-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .index-card {
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+
+        .index-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+        .index-card.active { border-color: var(--yellow); box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.3); }
+        .index-card.disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .index-name { font-weight: 700; font-size: 0.9rem; color: var(--text); }
+        .index-formula { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+        .index-summary { font-size: 0.8rem; color: var(--text-dim); }
+        .index-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--accent);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+        }
+
+        .index-active-card {
+            border: 1px solid var(--border);
+            background: rgba(37, 40, 54, 0.85);
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .index-active-card.visible { display: flex; }
+
+        .index-active-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .index-active-title { font-size: 0.9rem; font-weight: 700; }
+        .index-active-meta { font-size: 0.75rem; color: var(--text-dim); }
+        .index-stat-row { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-dim); gap: 8px; }
+        .index-stat-value { color: var(--green); font-family: 'JetBrains Mono', monospace; }
+
+        .index-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .index-controls button { padding: 6px 10px; font-size: 0.75rem; }
+
+        .pill-muted {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.12);
+            border: 1px solid var(--border);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
 
         /* Spectral Section - Below Map */
         .spectral-section {
@@ -1144,37 +1272,97 @@
             <!-- Filter Section -->
             <div class="filter-section">
                 <div class="filter-header">
-                    <h3>🧾 Threshold Filters</h3>
-                </div>
-                <div class="filter-selection" id="filterSelection">
-                    <p class="filter-instructions">Filtering spectral bands by thresholds allows you to isolate reflectance patterns and reveal features in the image. Try it yourself or choose a preset filter. You can also add a boolean OR expression inside Custom Thresholds.</p>
-                    <div class="filter-options" id="filterOptions"></div>
-                </div>
-                <div class="filter-active-header" id="filterActiveHeader" style="display:none;">
-                    <button class="clear-btn" id="clearFiltersBtn">Clear</button>
-                </div>
-                <div class="filter-content" id="filterContent">
-                    <div class="filter-empty">
-                        Click bands in the chart below to add reflectance filters
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-tab="threshold" id="thresholdTab">🧾 Threshold Filters</button>
+                        <button class="filter-tab" data-tab="indices" id="indicesTab">🌿 Spectral Indices</button>
+                    </div>
+                    <div class="filter-actions" id="filterActions">
+                        <button class="clear-btn" id="clearFiltersBtn">Clear</button>
                     </div>
                 </div>
-                <div class="filter-stats" id="filterStats" style="display:none;">
-                    <div class="stat-row">
-                        <span class="stat-label">Matching:</span>
-                        <span class="stat-value" id="matchingPixels">--</span>
+                <div class="filter-body">
+                    <div id="thresholdPanel">
+                        <div class="filter-selection" id="filterSelection">
+                            <p class="filter-instructions">Filtering spectral bands by thresholds allows you to isolate reflectance patterns and reveal features in the image. Try it yourself or choose a preset filter. You can also add a boolean OR expression inside Custom Thresholds.</p>
+                            <div class="filter-options" id="filterOptions"></div>
+                        </div>
+                        <div class="filter-active-header" id="filterActiveHeader" style="display:none;" data-has-active="false">
+                            <button class="clear-btn" id="clearFiltersBtnSecondary">Clear</button>
+                        </div>
+                        <div class="filter-content" id="filterContent">
+                            <div class="filter-empty">
+                                Click bands in the chart below to add reflectance filters
+                            </div>
+                        </div>
+                        <div class="filter-stats" id="filterStats" style="display:none;">
+                            <div class="stat-row">
+                                <span class="stat-label">Matching:</span>
+                                <span class="stat-value" id="matchingPixels">--</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Coverage:</span>
+                                <span class="stat-value" id="matchingPercent">--</span>
+                            </div>
+                            <div class="stat-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                                <span class="stat-label">Mask Opacity:</span>
+                                <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="flex: 1;">
+                                <span class="stat-value" id="maskOpacityVal" style="min-width: 35px;">70%</span>
+                            </div>
+                        </div>
+                        <div class="export-row">
+                            <button class="export-btn" id="exportBtn">⬇️ Export Report</button>
+                        </div>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-label">Coverage:</span>
-                        <span class="stat-value" id="matchingPercent">--</span>
+
+                    <div id="indicesPanel" style="display:none; padding: 10px; overflow-y: auto;">
+                        <div id="indicesSelection">
+                            <p class="filter-instructions">Render common vegetation and water indices. Selecting an index overlays it on the map, and you can fine-tune thresholds to keep only pixels in range while the RGB base image stays visible underneath.</p>
+                            <div class="indices-panel">
+                                <div class="indices-list" id="indicesList"></div>
+                            </div>
+                        </div>
+                        <div id="indexDetail" style="display:none;">
+                            <div class="filter-active-header" id="indexActiveHeader" style="justify-content: space-between;">
+                                <button class="clear-btn" id="indexBackBtn">← Indices</button>
+                                <button class="clear-btn" id="clearIndexBtn">Clear</button>
+                            </div>
+                            <div class="index-active-card visible" id="indexActiveCard">
+                                <div class="index-active-header">
+                                    <div>
+                                        <div class="index-active-title" id="indexActiveTitle">Index</div>
+                                        <div class="index-active-meta" id="indexActiveFormula">Formula</div>
+                                    </div>
+                                    <div class="index-pill" id="indexActiveRange">Range</div>
+                                </div>
+                                <div class="index-active-meta" id="indexActiveDescription"></div>
+                                <div class="index-active-meta" id="indexActiveInterpretation"></div>
+                                <div class="range-slider-container" id="indexSlider" style="margin-top:8px;">
+                                    <div class="range-track"></div>
+                                    <div class="range-fill" id="indexRangeFill" style="left:0%;width:100%;"></div>
+                                    <div class="range-handle min" id="indexHandleMin" style="left:0%;"></div>
+                                    <div class="range-handle max" id="indexHandleMax" style="left:100%;"></div>
+                                </div>
+                                <div class="range-values">
+                                    <label>Min<input type="number" class="range-input" id="indexMinInput" step="0.0001"></label>
+                                    <label>Max<input type="number" class="range-input" id="indexMaxInput" step="0.0001"></label>
+                                </div>
+                                <div class="index-controls">
+                                    <label class="index-active-meta" style="display:flex;align-items:center;gap:8px;">Mask Opacity
+                                        <input type="range" id="indexMaskOpacity" min="0" max="1" step="0.05" value="0.65" style="width:130px;">
+                                        <span class="stat-value" id="indexMaskOpacityVal">65%</span>
+                                    </label>
+                                </div>
+                                <div class="index-stat-row">
+                                    <span>Matching Pixels: <span class="index-stat-value" id="indexMatchCount">--</span></span>
+                                    <span>Coverage: <span class="index-stat-value" id="indexMatchPercent">--</span></span>
+                                </div>
+                                <div class="index-stat-row">
+                                    <span>Data Range: <span class="index-stat-value" id="indexDataRange">--</span></span>
+                                    <span>Threshold: <span class="index-stat-value" id="indexThresholdText">--</span></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-                        <span class="stat-label">Mask Opacity:</span>
-                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="flex: 1;">
-                        <span class="stat-value" id="maskOpacityVal" style="min-width: 35px;">70%</span>
-                    </div>
-                </div>
-                <div class="export-row">
-                    <button class="export-btn" id="exportBtn">⬇️ Export Report</button>
                 </div>
                 <div class="loading-overlay hidden" id="filterLoading">
                     <div class="spinner"></div>
@@ -1342,6 +1530,59 @@
                 { name: 'NIR', center: 830, color: '#991b1b' }
             ]
         };
+
+        const SPECTRAL_INDICES = [
+            {
+                id: 'ndvi',
+                name: 'NDVI',
+                formula: '(NIR − Red) / (NIR + Red)',
+                bands: ['NIR', 'Red'],
+                summary: 'Used to visualize vegetation vigor and presence.',
+                interpretation: '< 0: water, clouds, snow • 0–0.2: bare soil, rock, built surfaces • > 0.2: vegetation',
+                detail: 'NDVI exploits the contrast between strong NIR reflectance and red absorption in healthy vegetation. Values range from −1 to 1.',
+                defaultThreshold: { min: 0.2, max: 1 }
+            },
+            {
+                id: 'evi',
+                name: 'EVI',
+                formula: '2.5 × (NIR − Red) / (NIR + 6×Red − 7.5×Blue + 1)',
+                bands: ['NIR', 'Red', 'Blue'],
+                summary: 'Used to monitor vegetation in high-biomass and atmospherically noisy conditions.',
+                interpretation: 'Corrects for soil background and atmospheric scattering using the blue band; reduces saturation in dense vegetation.',
+                detail: 'EVI improves on NDVI by correcting for soil background and atmospheric scattering using the blue band. It reduces saturation in dense vegetation.',
+                defaultThreshold: { min: 0.2, max: 1 }
+            },
+            {
+                id: 'ndre',
+                name: 'NDRE',
+                formula: '(NIR − Red Edge) / (NIR + Red Edge)',
+                bands: ['NIR', 'Red Edge'],
+                summary: 'Used to assess chlorophyll content and crop stress.',
+                interpretation: 'More sensitive to subtle vegetation stress and mid-to-late season crops when NDVI saturates.',
+                detail: 'NDRE leverages the red-edge band, making it more sensitive than NDVI to subtle vegetation stress, nitrogen status, and mid-to-late season crops.',
+                defaultThreshold: { min: 0.0, max: 0.6 }
+            },
+            {
+                id: 'ndwi',
+                name: 'NDWI (McFeeters)',
+                formula: '(Green − NIR) / (Green + NIR)',
+                bands: ['Green', 'NIR'],
+                summary: 'Used to detect open water and surface moisture.',
+                interpretation: 'Positive values typically indicate water; vegetation and soil yield negative values.',
+                detail: 'NDWI enhances water bodies by contrasting strong green reflectance with strong NIR absorption in water.',
+                defaultThreshold: { min: 0.0, max: 1 }
+            },
+            {
+                id: 'bsi',
+                name: 'BSI (Bare Soil Index)',
+                formula: '((Red + Green) − (NIR + Blue)) / ((Red + Green) + (NIR + Blue))',
+                bands: ['Red', 'Green', 'NIR', 'Blue'],
+                summary: 'Used to identify exposed soil and sparsely vegetated land.',
+                interpretation: 'Higher values correspond to bare or disturbed soils; vegetated surfaces return low or negative values.',
+                detail: 'BSI enhances bare and disturbed soils by contrasting visible reflectance with NIR absorption.',
+                defaultThreshold: { min: 0.0, max: 1 }
+            }
+        ];
 
         // Image-specific threshold filter presets
         const IMAGE_SPECIFIC_PRESETS = {
@@ -1565,7 +1806,13 @@
             currentImageLabel: 'N/A',
             filterMode: 'custom',
             isDataLoading: false,
-            isVizUpdating: false
+            isVizUpdating: false,
+            activeTab: 'threshold',
+            activeIndexId: null,
+            indexCache: {},
+            indexThresholds: {},
+            indexOverlayOpacity: 0.65,
+            indexStats: {}
         };
 
         const el = {
@@ -1618,12 +1865,42 @@
             filterOptions: document.getElementById('filterOptions'),
             filterActiveHeader: document.getElementById('filterActiveHeader'),
             filterCustomPrompt: document.getElementById('filterCustomPrompt'),
+            filterActions: document.getElementById('filterActions'),
             chartNote: document.getElementById('chartNote'),
             sampleTool: document.getElementById('sampleTool'),
             panTool: document.getElementById('panTool'),
             cloudImageSelect: document.getElementById('cloudImageSelect'),
             methodsBtn: document.getElementById('methodsBtn'),
-            exportBtn: document.getElementById('exportBtn')
+            exportBtn: document.getElementById('exportBtn'),
+            thresholdTab: document.getElementById('thresholdTab'),
+            indicesTab: document.getElementById('indicesTab'),
+            thresholdPanel: document.getElementById('thresholdPanel'),
+            indicesPanel: document.getElementById('indicesPanel'),
+            indexActiveCard: document.getElementById('indexActiveCard'),
+            indexActiveTitle: document.getElementById('indexActiveTitle'),
+            indexActiveFormula: document.getElementById('indexActiveFormula'),
+            indexActiveDescription: document.getElementById('indexActiveDescription'),
+            indexActiveRange: document.getElementById('indexActiveRange'),
+            indexMaskOpacity: document.getElementById('indexMaskOpacity'),
+            indexMaskOpacityVal: document.getElementById('indexMaskOpacityVal'),
+            indicesList: document.getElementById('indicesList'),
+            indicesSelection: document.getElementById('indicesSelection'),
+            indexDetail: document.getElementById('indexDetail'),
+            indexActiveInterpretation: document.getElementById('indexActiveInterpretation'),
+            indexActiveHeader: document.getElementById('indexActiveHeader'),
+            indexBackBtn: document.getElementById('indexBackBtn'),
+            clearIndexBtn: document.getElementById('clearIndexBtn'),
+            indexMatchCount: document.getElementById('indexMatchCount'),
+            indexMatchPercent: document.getElementById('indexMatchPercent'),
+            indexDataRange: document.getElementById('indexDataRange'),
+            indexThresholdText: document.getElementById('indexThresholdText'),
+            indexSlider: document.getElementById('indexSlider'),
+            indexRangeFill: document.getElementById('indexRangeFill'),
+            indexHandleMin: document.getElementById('indexHandleMin'),
+            indexHandleMax: document.getElementById('indexHandleMax'),
+            indexMinInput: document.getElementById('indexMinInput'),
+            indexMaxInput: document.getElementById('indexMaxInput'),
+            indexActiveCardRange: document.getElementById('indexActiveRange')
         };
 
         function beginGlobalLoading(message = 'Loading image...') {
@@ -1674,10 +1951,31 @@
             if (el.pageOverlay) el.pageOverlay.classList.add('hidden');
         }
 
+        function resetIndexState() {
+            state.activeIndexId = null;
+            state.indexCache = {};
+            state.indexThresholds = {};
+            state.indexStats = {};
+            updateIndexUI();
+        }
+
+        function setActiveTab(tab) {
+            state.activeTab = tab;
+            if (el.thresholdTab) el.thresholdTab.classList.toggle('active', tab === 'threshold');
+            if (el.indicesTab) el.indicesTab.classList.toggle('active', tab === 'indices');
+            if (el.thresholdPanel) el.thresholdPanel.style.display = tab === 'threshold' ? 'block' : 'none';
+            if (el.indicesPanel) el.indicesPanel.style.display = tab === 'indices' ? 'block' : 'none';
+            if (el.filterActions) el.filterActions.style.display = tab === 'threshold' ? 'flex' : 'none';
+            if (el.filterActiveHeader) el.filterActiveHeader.style.display = (tab === 'threshold' && el.filterActiveHeader.dataset.hasActive === 'true') ? 'block' : 'none';
+            applyOverlay();
+        }
+
         function prepareFiltersForNewImage() {
             resetFilterUI();
             state.thresholds = {};
             state.booleanMode = false;
+            resetIndexState();
+            state.bandInfo = [];
             resetRules();
             state.currentReflectance = [];
             state.bandPositions = [];
@@ -1687,6 +1985,7 @@
             applyThresholdHighlight();
             if (el.filterOptions) el.filterOptions.innerHTML = '';
             showFilterLoading();
+            setActiveTab('threshold');
         }
 
         // Tool selection
@@ -1703,6 +2002,16 @@
             el.sampleTool.classList.remove('active');
             el.mainCanvas.className = 'pan-mode';
         });
+
+        if (el.thresholdTab) {
+            el.thresholdTab.addEventListener('click', () => setActiveTab('threshold'));
+        }
+        if (el.indicesTab) {
+            el.indicesTab.addEventListener('click', () => {
+                setActiveTab('indices');
+                updateIndexUI();
+            });
+        }
 
         if (el.methodsBtn) {
             el.methodsBtn.addEventListener('click', () => {
@@ -1903,11 +2212,13 @@
         }
 
         function selectFilterMode(mode) {
+            setActiveTab('threshold');
             state.filterMode = mode;
 
             // Hide selection UI, show active header with clear button
             el.filterSelection.style.display = 'none';
             el.filterActiveHeader.style.display = 'block';
+            el.filterActiveHeader.dataset.hasActive = 'true';
 
             // Show custom prompt only for custom mode
             if (el.filterCustomPrompt) {
@@ -1924,10 +2235,288 @@
             // Show selection UI again, hide active header
             el.filterSelection.style.display = 'block';
             el.filterActiveHeader.style.display = 'none';
+            el.filterActiveHeader.dataset.hasActive = 'false';
             if (el.filterCustomPrompt) {
                 el.filterCustomPrompt.style.display = 'none';
             }
             state.filterMode = 'custom';
+        }
+
+        function findBandIndexByName(name) {
+            return state.bandInfo.findIndex(b => b.name.toLowerCase().includes(name.toLowerCase()));
+        }
+
+        function hasBandsForIndex(indexDef) {
+            if (!indexDef || !state.bandInfo.length) return false;
+            return indexDef.bands.every(b => findBandIndexByName(b) >= 0);
+        }
+
+        function getIndexDef(id) {
+            return SPECTRAL_INDICES.find(i => i.id === id);
+        }
+
+        function getIndexStats(def) {
+            if (!def) return { min: -1, max: 1 };
+            return state.indexStats[def.id] || { min: -1, max: 1 };
+        }
+
+        function clampValue(val, min, max) {
+            if (!Number.isFinite(val)) return min;
+            return Math.min(max, Math.max(min, val));
+        }
+
+        function ensureIndexComputed(def) {
+            if (!def) return null;
+            if (!hasBandsForIndex(def)) return null;
+            if (state.indexCache[def.id]) return state.indexCache[def.id];
+
+            const total = state.width * state.height;
+            const data = new Float32Array(total);
+
+            const idxLookup = {};
+            def.bands.forEach(b => { idxLookup[b.toLowerCase()] = findBandIndexByName(b); });
+
+            const nir = idxLookup['nir'] >= 0 ? state.rasterData[idxLookup['nir']] : null;
+            const red = idxLookup['red'] >= 0 ? state.rasterData[idxLookup['red']] : null;
+            const green = idxLookup['green'] >= 0 ? state.rasterData[idxLookup['green']] : null;
+            const blue = idxLookup['blue'] >= 0 ? state.rasterData[idxLookup['blue']] : null;
+            const redEdge = idxLookup['red edge'] >= 0 ? state.rasterData[idxLookup['red edge']] : null;
+
+            let min = Infinity, max = -Infinity;
+
+            const safeDiv = (num, den) => {
+                if (!Number.isFinite(num) || !Number.isFinite(den) || Math.abs(den) < 1e-6) return 0;
+                return num / den;
+            };
+
+            for (let i = 0; i < total; i++) {
+                let val = 0;
+                switch (def.id) {
+                    case 'ndvi':
+                        val = safeDiv((nir[i] - red[i]), (nir[i] + red[i]));
+                        break;
+                    case 'evi':
+                        val = safeDiv(2.5 * (nir[i] - red[i]), (nir[i] + 6 * red[i] - 7.5 * blue[i] + 1));
+                        break;
+                    case 'ndre':
+                        val = safeDiv((nir[i] - redEdge[i]), (nir[i] + redEdge[i]));
+                        break;
+                    case 'ndwi':
+                        val = safeDiv((green[i] - nir[i]), (green[i] + nir[i]));
+                        break;
+                    case 'bsi':
+                        const vis = red[i] + green[i];
+                        const nirBlue = nir[i] + blue[i];
+                        val = safeDiv((vis - nirBlue), (vis + nirBlue));
+                        break;
+                    default:
+                        val = 0;
+                }
+                data[i] = val;
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+
+            if (!Number.isFinite(min)) min = -1;
+            if (!Number.isFinite(max)) max = 1;
+            state.indexCache[def.id] = data;
+            state.indexStats[def.id] = { min, max };
+            return data;
+        }
+
+        function getIndexThreshold(def) {
+            if (!def) return null;
+            const stats = getIndexStats(def);
+            if (!state.indexThresholds[def.id]) {
+                const defaults = def.defaultThreshold || { min: stats.min, max: stats.max };
+                state.indexThresholds[def.id] = {
+                    min: clampValue(defaults.min, stats.min, stats.max),
+                    max: clampValue(defaults.max, stats.min, stats.max)
+                };
+            }
+            return state.indexThresholds[def.id];
+        }
+
+        function formatRange(min, max, decimals = 3) {
+            return `${min.toFixed(decimals)} – ${max.toFixed(decimals)}`;
+        }
+
+        function renderIndicesList() {
+            if (!el.indicesList) return;
+            el.indicesList.innerHTML = '';
+            SPECTRAL_INDICES.forEach(def => {
+                const card = document.createElement('div');
+                const available = hasBandsForIndex(def);
+                card.className = 'index-card';
+                if (state.activeIndexId === def.id) card.classList.add('active');
+                if (!available) card.classList.add('disabled');
+                card.innerHTML = `
+                    <div class="index-name">${def.name}</div>
+                    <div class="index-formula">${def.formula}</div>
+                    <div class="index-summary">${def.summary}</div>
+                    <div class="index-pill">${available ? 'Click to render' : 'Missing required bands'}</div>
+                `;
+                if (available) {
+                    card.addEventListener('click', () => {
+                        selectIndex(def.id);
+                    });
+                }
+                el.indicesList.appendChild(card);
+            });
+        }
+
+        function updateIndexUI() {
+            renderIndicesList();
+            updateIndexCard();
+        }
+
+        function selectIndex(id) {
+            const def = getIndexDef(id);
+            if (!def) return;
+            if (!hasBandsForIndex(def)) {
+                alert('This index is not available for the loaded image.');
+                return;
+            }
+            state.activeIndexId = id;
+            ensureIndexComputed(def);
+            getIndexThreshold(def);
+            setActiveTab('indices');
+            updateIndexUI();
+            applyOverlay();
+        }
+
+        function updateIndexCard() {
+            if (!el.indexActiveCard) return;
+            const def = getIndexDef(state.activeIndexId);
+            if (!def) {
+                if (el.indicesSelection) el.indicesSelection.style.display = 'block';
+                if (el.indexDetail) el.indexDetail.style.display = 'none';
+                el.indexActiveCard.classList.remove('visible');
+                el.indexMatchCount.textContent = '--';
+                el.indexMatchPercent.textContent = '--';
+                return;
+            }
+
+            const stats = getIndexStats(def);
+            const threshold = getIndexThreshold(def);
+            if (el.indicesSelection) el.indicesSelection.style.display = 'none';
+            if (el.indexDetail) el.indexDetail.style.display = 'block';
+            el.indexActiveCard.classList.add('visible');
+            el.indexActiveTitle.textContent = def.name;
+            el.indexActiveFormula.textContent = def.formula;
+            el.indexActiveDescription.textContent = def.summary;
+            if (el.indexActiveInterpretation) el.indexActiveInterpretation.textContent = def.interpretation;
+            el.indexActiveRange.textContent = formatRange(stats.min, stats.max, 3);
+            el.indexThresholdText.textContent = formatRange(threshold.min, threshold.max, 3);
+            el.indexDataRange.textContent = formatRange(stats.min, stats.max, 3);
+            if (el.indexMaskOpacityVal) el.indexMaskOpacityVal.textContent = Math.round(state.indexOverlayOpacity * 100) + '%';
+
+            syncIndexOpacityInputs();
+            syncIndexFields();
+        }
+
+        function syncIndexOpacityInputs() {
+            const pct = Math.round(state.indexOverlayOpacity * 100) + '%';
+            if (el.indexMaskOpacity) {
+                el.indexMaskOpacity.value = state.indexOverlayOpacity;
+                el.indexMaskOpacityVal.textContent = pct;
+            }
+        }
+
+        function syncIndexFields() {
+            const def = getIndexDef(state.activeIndexId);
+            if (!def) return;
+            const stats = getIndexStats(def);
+            const threshold = getIndexThreshold(def);
+            if (el.indexMinInput) el.indexMinInput.value = threshold.min.toFixed(4);
+            if (el.indexMaxInput) el.indexMaxInput.value = threshold.max.toFixed(4);
+            if (el.indexThresholdText) el.indexThresholdText.textContent = formatRange(threshold.min, threshold.max, 3);
+            syncIndexSlider(threshold, stats);
+        }
+
+        function syncIndexSlider(threshold, stats) {
+            if (!el.indexSlider || !stats) return;
+            const minPct = clampPercent(valueToPercent(threshold.min, stats));
+            const maxPct = clampPercent(valueToPercent(threshold.max, stats));
+            if (el.indexRangeFill) {
+                el.indexRangeFill.style.left = `${minPct}%`;
+                el.indexRangeFill.style.width = `${Math.max(maxPct - minPct, 0)}%`;
+            }
+            if (el.indexHandleMin) el.indexHandleMin.style.left = `${minPct}%`;
+            if (el.indexHandleMax) el.indexHandleMax.style.left = `${maxPct}%`;
+        }
+
+        function adjustIndexThreshold(value, isMin) {
+            const def = getIndexDef(state.activeIndexId);
+            if (!def) return;
+            const stats = getIndexStats(def);
+            const t = getIndexThreshold(def);
+            const range = stats.max - stats.min;
+            const epsilon = Math.max(range * 0.002, 1e-6);
+            value = clampValue(value, stats.min, stats.max);
+            if (isMin) {
+                t.min = Math.min(value, t.max - epsilon);
+            } else {
+                t.max = Math.max(value, t.min + epsilon);
+            }
+            syncIndexFields();
+            updateIndexCard();
+            applyOverlay();
+        }
+
+        function startIndexDrag(isMin) {
+            const onMove = e => {
+                const def = getIndexDef(state.activeIndexId);
+                if (!def || !el.indexSlider) return;
+                const rect = el.indexSlider.getBoundingClientRect();
+                let pct = (e.clientX - rect.left) / rect.width;
+                pct = Math.max(0, Math.min(1, pct));
+                const stats = getIndexStats(def);
+                const value = stats.min + pct * (stats.max - stats.min);
+                adjustIndexThreshold(value, isMin);
+            };
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+
+        if (el.indexHandleMin) {
+            el.indexHandleMin.addEventListener('mousedown', e => { e.stopPropagation(); startIndexDrag(true); });
+        }
+        if (el.indexHandleMax) {
+            el.indexHandleMax.addEventListener('mousedown', e => { e.stopPropagation(); startIndexDrag(false); });
+        }
+        if (el.indexMinInput) {
+            el.indexMinInput.addEventListener('change', () => {
+                const val = parseFloat(el.indexMinInput.value);
+                if (Number.isFinite(val)) adjustIndexThreshold(val, true);
+            });
+        }
+        if (el.indexMaxInput) {
+            el.indexMaxInput.addEventListener('change', () => {
+                const val = parseFloat(el.indexMaxInput.value);
+                if (Number.isFinite(val)) adjustIndexThreshold(val, false);
+            });
+        }
+
+        function clearIndexSelection() {
+            if (state.activeIndexId && state.indexThresholds[state.activeIndexId]) {
+                delete state.indexThresholds[state.activeIndexId];
+            }
+            state.activeIndexId = null;
+            updateIndexUI();
+            applyOverlay();
+        }
+
+        if (el.indexBackBtn) {
+            el.indexBackBtn.addEventListener('click', clearIndexSelection);
+        }
+
+        if (el.clearIndexBtn) {
+            el.clearIndexBtn.addEventListener('click', clearIndexSelection);
         }
 
         function applyImagePreset(preset) {
@@ -2119,6 +2708,7 @@
 
             // Update filter options to show image-specific presets if available
             renderFilterOptions();
+            updateIndexUI();
             hideFilterLoading();
 
             renderImage();
@@ -2154,8 +2744,15 @@
                 state.rasterData.push(scaled);
             }
             computeBandStats();
+            state.indexCache = {};
+            state.indexStats = {};
             
             updateDataInfoPanel();
+            if (state.activeIndexId) {
+                ensureIndexComputed(getIndexDef(state.activeIndexId));
+                updateIndexCard();
+                applyOverlay();
+            }
         }
 
         function computeBandStats() {
@@ -2443,9 +3040,22 @@
             el.maskOpacity.addEventListener('input', e => {
                 state.maskOpacity = +e.target.value;
                 el.maskOpacityVal.textContent = Math.round(state.maskOpacity * 100) + '%';
-                applyThresholdHighlight();
+                applyOverlay();
             });
         }
+
+        function setIndexOverlayOpacity(val) {
+            state.indexOverlayOpacity = val;
+            syncIndexOpacityInputs();
+            applyOverlay();
+        }
+
+        if (el.indexMaskOpacity) {
+            el.indexMaskOpacity.addEventListener('input', e => {
+                setIndexOverlayOpacity(+e.target.value);
+            });
+        }
+
 
         el.windowSize.addEventListener('change', e => {
             state.windowSize = +e.target.value;
@@ -2803,6 +3413,7 @@
         }
 
         function toggleBandThreshold(bandIndex) {
+            setActiveTab('threshold');
             // Automatically enter custom mode when clicking a band
             selectFilterMode('custom');
 
@@ -3220,7 +3831,20 @@
             });
         }
 
+        function applyOverlay() {
+            if (state.activeTab === 'indices' && state.activeIndexId) {
+                applyIndexOverlay();
+            } else {
+                applyThresholdOverlay();
+            }
+        }
+
+        // Backwards compatibility for existing calls
         function applyThresholdHighlight() {
+            applyOverlay();
+        }
+
+        function applyThresholdOverlay() {
             const ctx = el.overlayCanvas.getContext('2d');
             ctx.clearRect(0, 0, el.overlayCanvas.width, el.overlayCanvas.height);
 
@@ -3314,7 +3938,70 @@
             el.matchingPercent.textContent = ((matchCount / totalPixels) * 100).toFixed(2) + '%';
         }
 
-        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+        function indexColorForValue(value, stats) {
+            const norm = Math.max(0, Math.min(1, (value - stats.min) / ((stats.max - stats.min) || 1)));
+            const lerp = (a, b, t) => a + (b - a) * t;
+            let r, g, b;
+            if (norm < 0.33) {
+                const t = norm / 0.33;
+                r = lerp(59, 34, t); g = lerp(130, 211, t); b = lerp(246, 238, t); // blue -> cyan
+            } else if (norm < 0.66) {
+                const t = (norm - 0.33) / 0.33;
+                r = lerp(34, 34, t); g = lerp(211, 197, t); b = lerp(238, 94, t); // cyan -> green
+            } else {
+                const t = (norm - 0.66) / 0.34;
+                r = lerp(34, 234, t); g = lerp(197, 179, t); b = lerp(94, 8, t); // green -> yellow
+            }
+            return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+        }
+
+        function applyIndexOverlay() {
+            const ctx = el.overlayCanvas.getContext('2d');
+            ctx.clearRect(0, 0, el.overlayCanvas.width, el.overlayCanvas.height);
+
+            const def = getIndexDef(state.activeIndexId);
+            if (!def) {
+                if (el.indexMatchCount) el.indexMatchCount.textContent = '--';
+                if (el.indexMatchPercent) el.indexMatchPercent.textContent = '--';
+                return;
+            }
+
+            const data = ensureIndexComputed(def);
+            const threshold = getIndexThreshold(def);
+            const stats = getIndexStats(def);
+            if (!data || !threshold) {
+                if (el.indexMatchCount) el.indexMatchCount.textContent = '--';
+                if (el.indexMatchPercent) el.indexMatchPercent.textContent = '--';
+                return;
+            }
+
+            const imgData = ctx.createImageData(state.width, state.height);
+            let matchCount = 0;
+            const totalPixels = state.width * state.height;
+            const alpha = Math.round(state.indexOverlayOpacity * 255);
+
+            for (let i = 0; i < totalPixels; i++) {
+                const val = data[i];
+                if (val >= threshold.min && val <= threshold.max) {
+                    const color = indexColorForValue(val, stats);
+                    imgData.data[i * 4] = color.r;
+                    imgData.data[i * 4 + 1] = color.g;
+                    imgData.data[i * 4 + 2] = color.b;
+                    imgData.data[i * 4 + 3] = alpha;
+                    matchCount++;
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            if (el.indexMatchCount) el.indexMatchCount.textContent = matchCount.toLocaleString();
+            if (el.indexMatchPercent) el.indexMatchPercent.textContent = totalPixels ? ((matchCount / totalPixels) * 100).toFixed(2) + '%' : '--';
+            if (el.indexThresholdText) {
+                const t = getIndexThreshold(def);
+                el.indexThresholdText.textContent = formatRange(t.min, t.max, 3);
+            }
+        }
+
+        function handleClearFilters() {
             state.thresholds = {};
             state.booleanMode = false;
             if (state.rules && state.rules.length) {
@@ -3332,8 +4019,13 @@
             updateFilterPanel();
             updateBandList();
             drawSpectralChart();
-            applyThresholdHighlight();
-        });
+            applyOverlay();
+        }
+
+        const clearPrimary = document.getElementById('clearFiltersBtn');
+        if (clearPrimary) clearPrimary.addEventListener('click', handleClearFilters);
+        const clearSecondary = document.getElementById('clearFiltersBtnSecondary');
+        if (clearSecondary) clearSecondary.addEventListener('click', handleClearFilters);
 
         // Resize handling
         window.addEventListener('resize', () => {
@@ -3343,6 +4035,7 @@
             }
         });
 
+        setActiveTab('threshold');
         updateImageOpacity();
         showFilterLoading();
         showPageOverlay('Loading demo image...');
