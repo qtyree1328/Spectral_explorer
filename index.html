@@ -606,6 +606,51 @@
 
         .filter-remove:hover { color: var(--red); }
 
+        .rule-select.active { border-color: var(--accent); color: var(--accent); }
+        .rule-eye {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 16px;
+        }
+        .rule-eye.disabled { opacity: 0.5; }
+        .rule-panel {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(37,40,54,0.6);
+            margin-bottom: 8px;
+        }
+        .rule-panel.active { border-color: var(--accent); }
+        .rule-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            gap: 8px;
+        }
+        .rule-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .rule-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .rule-collapse {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            padding: 4px;
+        }
+
         .range-slider-container {
             position: relative;
             height: 24px;
@@ -1102,7 +1147,7 @@
                     <h3>🧾 Threshold Filters</h3>
                 </div>
                 <div class="filter-selection" id="filterSelection">
-                    <p class="filter-instructions">Filtering spectral bands by thresholds allows you to isolate reflectance patterns and reveal features in the image. Try it yourself or choose a preset filter.</p>
+                    <p class="filter-instructions">Filtering spectral bands by thresholds allows you to isolate reflectance patterns and reveal features in the image. Try it yourself or choose a preset filter. You can also add a boolean OR expression inside Custom Thresholds.</p>
                     <div class="filter-options" id="filterOptions"></div>
                 </div>
                 <div class="filter-active-header" id="filterActiveHeader" style="display:none;">
@@ -1316,6 +1361,17 @@
                         { match: 'NIR', center: 865, min: 0.0850, max: 0.7000 },
                         { match: 'Red Edge', center: 705, min: 0.0002, max: 0.0550 }
                     ]
+                },
+                {
+                    name: 'Water OR Bare Soil (Boolean)',
+                    description: 'Demonstrates boolean preset support',
+                    boolean: {
+                        rules: [
+                            { enabled: true, bands: [{ match: 'NIR', center: 865, min: 0.0000, max: 0.0400 }] },
+                            { enabled: true, bands: [{ match: 'Red', center: 665, min: 0.1800, max: 0.6500 }] }
+                        ]
+                    },
+                    entries: []
                 }
             ],
             'Grand Prismatic': [
@@ -1495,6 +1551,13 @@
             windowSize: 11,
             currentReflectance: [],
             thresholds: {},
+            booleanMode: false,
+            rules: [
+                { name: 'Rule 1', enabled: true, thresholds: {}, collapsed: false },
+                { name: 'Rule 2', enabled: true, thresholds: {}, collapsed: false }
+            ],
+            ruleOp: 'OR',
+            activeRuleIndex: 0,
             bandPositions: [],
             bandStats: [],
             cloudImageList: [],
@@ -1614,6 +1677,8 @@
         function prepareFiltersForNewImage() {
             resetFilterUI();
             state.thresholds = {};
+            state.booleanMode = false;
+            resetRules();
             state.currentReflectance = [];
             state.bandPositions = [];
             updateFilterPanel();
@@ -1854,6 +1919,7 @@
             }
         }
 
+
         function resetFilterUI() {
             // Show selection UI again, hide active header
             el.filterSelection.style.display = 'block';
@@ -1869,6 +1935,52 @@
                 alert('Load an image before applying presets.');
                 return;
             }
+
+            if (preset.boolean) {
+                const preparedRules = [
+                    { enabled: preset.boolean.rules?.[0]?.enabled !== false, thresholds: {} },
+                    { enabled: preset.boolean.rules?.[1]?.enabled !== false, thresholds: {} }
+                ];
+
+                preparedRules.forEach((rulePreset, rIdx) => {
+                    const bands = preset.boolean.rules && preset.boolean.rules[rIdx] ? preset.boolean.rules[rIdx].bands || [] : [];
+                    bands.forEach(entry => {
+                        const idx = findBandIndexForPreset(entry);
+                        if (idx >= 0) {
+                            rulePreset.thresholds[idx] = {
+                                min: clampToBandRange(idx, entry.min),
+                                max: clampToBandRange(idx, entry.max)
+                            };
+                        }
+                    });
+                });
+
+                const total = Object.keys(preparedRules[0].thresholds).length + Object.keys(preparedRules[1].thresholds).length;
+                if (total === 0) {
+                    alert('Preset bands not available in this image.');
+                    return;
+                }
+
+                resetRules();
+                state.booleanMode = true;
+                state.ruleOp = 'OR';
+                state.rules[0].enabled = preparedRules[0].enabled;
+                state.rules[1].enabled = preparedRules[1].enabled;
+                state.rules[0].thresholds = preparedRules[0].thresholds;
+                state.rules[1].thresholds = preparedRules[1].thresholds;
+                state.rules[0].collapsed = false;
+                state.rules[1].collapsed = false;
+                state.activeRuleIndex = 0;
+                state.thresholds = {};
+                updateFilterPanel();
+                updateBandList();
+                drawSpectralChart();
+                applyThresholdHighlight();
+                return;
+            }
+
+            state.booleanMode = false;
+            resetRules();
 
             const newThresholds = {};
             preset.entries.forEach(entry => {
@@ -1996,6 +2108,8 @@
             resetView();
             resetSamplePosition();
             state.thresholds = {};
+            state.booleanMode = false;
+            resetRules();
             state.imageOpacity = 1;
             if (el.imageOpacity) el.imageOpacity.value = '1';
             updateImageOpacity();
@@ -2457,8 +2571,9 @@
         }
 
         function updateBandList() {
+            const thresholds = getActiveThresholds();
             el.bandList.innerHTML = state.currentReflectance.map((v, i) => {
-                const isSelected = state.thresholds.hasOwnProperty(i);
+                const isSelected = thresholds.hasOwnProperty(i);
                 const b = state.bandInfo[i];
                 return `
                     <div class="band-item ${isSelected ? 'selected' : ''}" data-band="${i}">
@@ -2499,6 +2614,7 @@
             ctx.fillRect(0, 0, W, H);
 
             if (!state.currentReflectance.length) return;
+            const thresholds = getActiveThresholds();
 
             const finiteValues = state.currentReflectance.filter(v => Number.isFinite(v));
             const safeValues = finiteValues.length ? finiteValues : [0];
@@ -2551,7 +2667,7 @@
                 const normalized = (val - yMin) / (yMax - yMin);
                 const barH = Math.max(0, Math.min(1, normalized)) * cH;
                 const y = pad.top + cH - barH;
-                const isSelected = state.thresholds.hasOwnProperty(i);
+                const isSelected = thresholds.hasOwnProperty(i);
 
                 if (isSelected) {
                     ctx.fillStyle = 'rgba(251, 191, 36, 0.15)';
@@ -2616,18 +2732,102 @@
         });
 
         // Thresholding
+        function resetRules() {
+            state.rules = [
+                { name: 'Rule 1', enabled: true, thresholds: {}, collapsed: false },
+                { name: 'Rule 2', enabled: true, thresholds: {}, collapsed: false }
+            ];
+            state.ruleOp = 'OR';
+            state.activeRuleIndex = 0;
+        }
+
+        function getActiveRule() {
+            if (!state.rules || state.rules.length < 2) resetRules();
+            if (state.activeRuleIndex >= state.rules.length) state.activeRuleIndex = 0;
+            const rule = state.rules[state.activeRuleIndex] || state.rules[0];
+            if (rule && typeof rule.collapsed === 'undefined') rule.collapsed = false;
+            return rule;
+        }
+
+        function getActiveThresholds() {
+            if (state.booleanMode) {
+                const rule = getActiveRule();
+                return rule && rule.thresholds ? rule.thresholds : {};
+            }
+            return state.thresholds;
+        }
+
+        function totalRuleThresholds() {
+            if (!state.rules) return 0;
+            return state.rules.reduce((sum, r) => sum + Object.keys(r.thresholds || {}).length, 0);
+        }
+
+        function enterBooleanMode() {
+            if (state.booleanMode) return;
+            if (!state.rules || state.rules.length < 2) resetRules();
+            state.rules[0].thresholds = { ...state.thresholds };
+            state.rules[0].enabled = true;
+            state.rules[0].collapsed = false;
+            state.rules[1].enabled = true;
+            state.rules[1].thresholds = {};
+            state.rules[1].collapsed = false;
+            state.ruleOp = 'OR';
+            state.booleanMode = true;
+            state.activeRuleIndex = 0;
+            state.thresholds = {};
+            selectFilterMode('custom');
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        }
+
+        function exitBooleanMode() {
+            state.booleanMode = false;
+            const merged = {};
+            if (!state.rules || state.rules.length < 2) resetRules();
+            state.rules.forEach((rule) => {
+                if (!rule || !rule.enabled) return;
+                Object.keys(rule.thresholds || {}).forEach(key => {
+                    if (!merged.hasOwnProperty(key)) {
+                        merged[key] = { ...(rule.thresholds[key] || {}) };
+                    }
+                });
+            });
+            state.thresholds = merged;
+            state.activeRuleIndex = 0;
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        }
+
         function toggleBandThreshold(bandIndex) {
             // Automatically enter custom mode when clicking a band
             selectFilterMode('custom');
 
-            if (state.thresholds.hasOwnProperty(bandIndex)) {
-                delete state.thresholds[bandIndex];
+            if (state.booleanMode) {
+                const rule = getActiveRule();
+                if (!rule.thresholds) rule.thresholds = {};
+                if (rule.thresholds.hasOwnProperty(bandIndex)) {
+                    delete rule.thresholds[bandIndex];
+                } else {
+                    const stats = getBandStats(bandIndex);
+                    rule.thresholds[bandIndex] = {
+                        min: stats.min,
+                        max: stats.max
+                    };
+                }
             } else {
-                const stats = getBandStats(bandIndex);
-                state.thresholds[bandIndex] = {
-                    min: stats.min,
-                    max: stats.max
-                };
+                if (state.thresholds.hasOwnProperty(bandIndex)) {
+                    delete state.thresholds[bandIndex];
+                } else {
+                    const stats = getBandStats(bandIndex);
+                    state.thresholds[bandIndex] = {
+                        min: stats.min,
+                        max: stats.max
+                    };
+                }
             }
             updateFilterPanel();
             updateBandList();
@@ -2636,49 +2836,290 @@
         }
 
         function updateFilterPanel() {
-            const bands = Object.keys(state.thresholds).map(Number);
+            if (!state.booleanMode) {
+                const bands = Object.keys(state.thresholds).map(Number);
+                // Only show boolean CTA after user has clicked "Custom Thresholds" (which shows filterActiveHeader)
+                const customModeActive = el.filterActiveHeader.style.display === 'block';
+                const showBooleanCta = state.filterMode === 'custom' && !state.booleanMode && customModeActive;
+                const booleanCta = showBooleanCta
+                    ? `<div class="filter-item" style="border:1px dashed var(--border); padding:8px; border-radius:6px; margin-bottom:8px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                                <div style="font-size:0.8rem;color:var(--text-muted);">Create a boolean OR expression</div>
+                                <button class="preset-btn" id="addBooleanInlineBtn">Add boolean OR expression</button>
+                            </div>
+                       </div>`
+                    : '';
 
-            if (bands.length === 0) {
-                el.filterContent.innerHTML = '<div class="filter-empty">Click bands in the chart below to add reflectance filters</div>';
+                if (bands.length === 0) {
+                el.filterContent.innerHTML = booleanCta + '<div class="filter-empty">Click bands in the chart below to add reflectance filters</div>';
                 el.filterStats.style.display = 'none';
+                const inlineBtn = document.getElementById('addBooleanInlineBtn');
+                if (inlineBtn) inlineBtn.addEventListener('click', enterBooleanMode);
                 return;
             }
 
-            el.filterStats.style.display = 'block';
+                el.filterStats.style.display = 'block';
 
-            el.filterContent.innerHTML = bands.map(i => {
-                const t = state.thresholds[i];
-                const b = state.bandInfo[i];
-                const stats = getBandStats(i);
-                const minPct = clampPercent(valueToPercent(t.min, stats));
-                const maxPct = clampPercent(valueToPercent(t.max, stats));
-                const fillWidth = Math.max(maxPct - minPct, 0);
-                return `
-                    <div class="filter-item">
-                        <div class="filter-item-header">
-                            <div class="filter-band-name">
-                                <div class="band-color" style="background: ${b.color}"></div>
-                                ${b.name}
+                el.filterContent.innerHTML = booleanCta + bands.map(i => {
+                    const t = state.thresholds[i];
+                    const b = state.bandInfo[i];
+                    const stats = getBandStats(i);
+                    const minPct = clampPercent(valueToPercent(t.min, stats));
+                    const maxPct = clampPercent(valueToPercent(t.max, stats));
+                    const fillWidth = Math.max(maxPct - minPct, 0);
+                    return `
+                        <div class="filter-item">
+                            <div class="filter-item-header">
+                                <div class="filter-band-name">
+                                    <div class="band-color" style="background: ${b.color}"></div>
+                                    ${b.name}
+                                </div>
+                                <button class="filter-remove threshold-remove" data-band="${i}">×</button>
                             </div>
-                            <button class="filter-remove" data-band="${i}">×</button>
+                            <div class="range-slider-container" data-band="${i}">
+                                <div class="range-track"></div>
+                                <div class="range-fill" style="left: ${minPct}%; width: ${fillWidth}%"></div>
+                                <div class="range-handle min" style="left: ${minPct}%"></div>
+                                <div class="range-handle max" style="left: ${maxPct}%"></div>
+                            </div>
+                            <div class="range-values">
+                                <label>Min<input type="number" class="range-input range-input-min" value="${t.min.toFixed(4)}" step="0.0001"></label>
+                                <label>Max<input type="number" class="range-input range-input-max" value="${t.max.toFixed(4)}" step="0.0001"></label>
+                            </div>
                         </div>
-                        <div class="range-slider-container" data-band="${i}">
-                            <div class="range-track"></div>
-                            <div class="range-fill" style="left: ${minPct}%; width: ${fillWidth}%"></div>
-                            <div class="range-handle min" style="left: ${minPct}%"></div>
-                            <div class="range-handle max" style="left: ${maxPct}%"></div>
+                    `;
+                }).join('');
+
+                const inlineBtn = document.getElementById('addBooleanInlineBtn');
+                if (inlineBtn) inlineBtn.addEventListener('click', enterBooleanMode);
+
+                el.filterContent.querySelectorAll('.threshold-remove').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        delete state.thresholds[+btn.dataset.band];
+                        updateFilterPanel();
+                        updateBandList();
+                        drawSpectralChart();
+                        applyThresholdHighlight();
+                    });
+                });
+
+                el.filterContent.querySelectorAll('.range-slider-container').forEach(container => {
+                    const bandIdx = +container.dataset.band;
+                    const minHandle = container.querySelector('.range-handle.min');
+                    const maxHandle = container.querySelector('.range-handle.max');
+
+                    const updateSlider = () => {
+                        const t = state.thresholds[bandIdx];
+                        const stats = getBandStats(bandIdx);
+                        const minPct = clampPercent(valueToPercent(t.min, stats));
+                        const maxPct = clampPercent(valueToPercent(t.max, stats));
+                        const fill = container.querySelector('.range-fill');
+                        fill.style.left = minPct + '%';
+                        fill.style.width = Math.max(maxPct - minPct, 0) + '%';
+                        minHandle.style.left = minPct + '%';
+                        maxHandle.style.left = maxPct + '%';
+                        const valuesEl = container.parentElement.querySelector('.range-values');
+                        if (valuesEl) {
+                            const minInput = valuesEl.querySelector('.range-input-min');
+                            const maxInput = valuesEl.querySelector('.range-input-max');
+                            if (minInput) minInput.value = t.min.toFixed(4);
+                            if (maxInput) maxInput.value = t.max.toFixed(4);
+                        }
+                    };
+
+                    const startDrag = (handle, isMin) => {
+                        const onMove = e => {
+                            const rect = container.getBoundingClientRect();
+                            let pct = (e.clientX - rect.left) / rect.width;
+                            pct = Math.max(0, Math.min(1, pct));
+                            const stats = getBandStats(bandIdx);
+                            const range = stats.max - stats.min;
+                            if (range <= 0) {
+                                state.thresholds[bandIdx].min = stats.min;
+                                state.thresholds[bandIdx].max = stats.max;
+                                updateSlider();
+                                return;
+                            }
+                            const value = stats.min + pct * range;
+                            const epsilon = Math.max(range * 0.002, 1e-6);
+                            if (isMin) {
+                                const maxAllowed = state.thresholds[bandIdx].max - epsilon;
+                                state.thresholds[bandIdx].min = clampToBandRange(bandIdx, Math.min(value, maxAllowed));
+                            } else {
+                                const minAllowed = state.thresholds[bandIdx].min + epsilon;
+                                state.thresholds[bandIdx].max = clampToBandRange(bandIdx, Math.max(value, minAllowed));
+                            }
+                            updateSlider();
+                            applyThresholdHighlight();
+                        };
+                        const onUp = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                        };
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onUp);
+                    };
+
+                    minHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(minHandle, true); });
+                    maxHandle.addEventListener('mousedown', e => { e.stopPropagation(); startDrag(maxHandle, false); });
+
+                    const handleInputChange = (inputEl, isMin) => {
+                        inputEl.addEventListener('change', () => {
+                            let val = parseFloat(inputEl.value);
+                            if (!Number.isFinite(val)) return;
+                            const stats = getBandStats(bandIdx);
+                            const range = stats.max - stats.min;
+                            const epsilon = Math.max(range * 0.002, 1e-6);
+                            val = clampToBandRange(bandIdx, val);
+                            if (isMin) {
+                                const maxAllowed = state.thresholds[bandIdx].max - epsilon;
+                                state.thresholds[bandIdx].min = Math.min(val, maxAllowed);
+                            } else {
+                                const minAllowed = state.thresholds[bandIdx].min + epsilon;
+                                state.thresholds[bandIdx].max = Math.max(val, minAllowed);
+                            }
+                            updateSlider();
+                            applyThresholdHighlight();
+                        });
+                    };
+
+                    const valuesEl = container.parentElement.querySelector('.range-values');
+                    if (valuesEl) {
+                        const minInput = valuesEl.querySelector('.range-input-min');
+                        const maxInput = valuesEl.querySelector('.range-input-max');
+                        if (minInput) handleInputChange(minInput, true);
+                        if (maxInput) handleInputChange(maxInput, false);
+                    }
+                });
+                return;
+            }
+
+            if (!state.rules || state.rules.length < 2) resetRules();
+            const anyThresholds = totalRuleThresholds() > 0;
+            el.filterStats.style.display = anyThresholds ? 'block' : 'none';
+
+            const renderThresholdItems = (thresholds, ruleIndex) => {
+                const bands = Object.keys(thresholds).map(Number);
+                if (!bands.length) {
+                    return '<div class="filter-empty" style="margin:6px 0;">Click bands to add filters to this rule</div>';
+                }
+                return bands.map(i => {
+                    const t = thresholds[i];
+                    const b = state.bandInfo[i];
+                    const stats = getBandStats(i);
+                    const minPct = clampPercent(valueToPercent(t.min, stats));
+                    const maxPct = clampPercent(valueToPercent(t.max, stats));
+                    const fillWidth = Math.max(maxPct - minPct, 0);
+                    return `
+                        <div class="filter-item" style="margin-bottom:8px; border-bottom:none; padding-bottom:4px;">
+                            <div class="filter-item-header">
+                                <div class="filter-band-name">
+                                    <div class="band-color" style="background: ${b.color}"></div>
+                                    ${b.name}
+                                </div>
+                                <button class="filter-remove threshold-remove" data-band="${i}" data-rule="${ruleIndex}">×</button>
+                            </div>
+                            <div class="range-slider-container" data-band="${i}" data-rule="${ruleIndex}">
+                                <div class="range-track"></div>
+                                <div class="range-fill" style="left: ${minPct}%; width: ${fillWidth}%"></div>
+                                <div class="range-handle min" style="left: ${minPct}%"></div>
+                                <div class="range-handle max" style="left: ${maxPct}%"></div>
+                            </div>
+                            <div class="range-values">
+                                <label>Min<input type="number" class="range-input range-input-min" value="${t.min.toFixed(4)}" step="0.0001"></label>
+                                <label>Max<input type="number" class="range-input range-input-max" value="${t.max.toFixed(4)}" step="0.0001"></label>
+                            </div>
                         </div>
-                        <div class="range-values">
-                            <label>Min<input type="number" class="range-input range-input-min" value="${t.min.toFixed(4)}" step="0.0001"></label>
-                            <label>Max<input type="number" class="range-input range-input-max" value="${t.max.toFixed(4)}" step="0.0001"></label>
+                    `;
+                }).join('');
+            };
+
+            const ruleBlocks = [0, 1].map(idx => {
+                const rule = state.rules[idx];
+                const thresholds = rule.thresholds || {};
+                const isActive = state.activeRuleIndex === idx;
+                const collapsed = rule.collapsed;
+                return `
+                    <div class="rule-panel ${isActive ? 'active' : ''}" data-rule="${idx}">
+                        <div class="rule-header" data-rule="${idx}">
+                            <div class="rule-title">${rule.name}${idx === 1 ? ' (OR)' : ''}</div>
+                            <div class="rule-actions">
+                                <button class="rule-eye ${rule.enabled ? '' : 'disabled'}" data-rule="${idx}" title="${rule.enabled ? 'Hide rule from map' : 'Show rule on map'}">👁</button>
+                                <button class="filter-remove rule-remove" data-rule="${idx}" title="Remove all filters in this rule">×</button>
+                                <button class="rule-collapse" data-rule="${idx}" title="${collapsed ? 'Expand filters' : 'Collapse filters'}">${collapsed ? '▸' : '▾'}</button>
+                            </div>
+                        </div>
+                        <div class="rule-body" data-rule="${idx}" style="display:${collapsed ? 'none' : 'block'}; margin-top:6px;">
+                            ${renderThresholdItems(thresholds, idx)}
                         </div>
                     </div>
                 `;
             }).join('');
 
-            el.filterContent.querySelectorAll('.filter-remove').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    delete state.thresholds[+btn.dataset.band];
+            const addRulePlaceholder = `
+                <div class="rule-panel" style="opacity:0.6;">
+                    <div class="rule-header" style="cursor:default;">
+                        <div class="rule-title">+ Add another rule</div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">Two rules supported for now</div>
+                    </div>
+                </div>
+            `;
+
+            el.filterContent.innerHTML = ruleBlocks + addRulePlaceholder;
+
+            el.filterContent.querySelectorAll('.rule-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const idx = +header.dataset.rule;
+                    if (!Number.isFinite(idx)) return;
+                    state.activeRuleIndex = idx;
+                    if (state.rules[idx]) state.rules[idx].collapsed = false;
+                    updateFilterPanel();
+                    updateBandList();
+                    drawSpectralChart();
+                });
+            });
+
+            el.filterContent.querySelectorAll('.rule-eye').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const idx = +btn.dataset.rule;
+                    if (!state.rules[idx]) return;
+                    state.rules[idx].enabled = !state.rules[idx].enabled;
+                    updateFilterPanel();
+                    applyThresholdHighlight();
+                });
+            });
+
+            el.filterContent.querySelectorAll('.rule-remove').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const idx = +btn.dataset.rule;
+                    if (!state.rules[idx]) return;
+                    state.rules[idx].thresholds = {};
+                    state.rules[idx].enabled = true;
+                    updateFilterPanel();
+                    updateBandList();
+                    drawSpectralChart();
+                    applyThresholdHighlight();
+                });
+            });
+
+            el.filterContent.querySelectorAll('.rule-collapse').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const idx = +btn.dataset.rule;
+                    if (!state.rules[idx]) return;
+                    state.rules[idx].collapsed = !state.rules[idx].collapsed;
+                    updateFilterPanel();
+                });
+            });
+
+            el.filterContent.querySelectorAll('.threshold-remove').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const ruleIdx = btn.dataset.rule !== undefined ? +btn.dataset.rule : state.activeRuleIndex;
+                    if (!state.rules[ruleIdx] || !state.rules[ruleIdx].thresholds) return;
+                    delete state.rules[ruleIdx].thresholds[+btn.dataset.band];
                     updateFilterPanel();
                     updateBandList();
                     drawSpectralChart();
@@ -2688,11 +3129,14 @@
 
             el.filterContent.querySelectorAll('.range-slider-container').forEach(container => {
                 const bandIdx = +container.dataset.band;
+                const ruleIdx = container.dataset.rule !== undefined ? +container.dataset.rule : state.activeRuleIndex;
+                if (!state.rules[ruleIdx] || !state.rules[ruleIdx].thresholds || !state.rules[ruleIdx].thresholds.hasOwnProperty(bandIdx)) return;
+                const thresholds = state.rules[ruleIdx].thresholds;
                 const minHandle = container.querySelector('.range-handle.min');
                 const maxHandle = container.querySelector('.range-handle.max');
 
                 const updateSlider = () => {
-                    const t = state.thresholds[bandIdx];
+                    const t = thresholds[bandIdx];
                     const stats = getBandStats(bandIdx);
                     const minPct = clampPercent(valueToPercent(t.min, stats));
                     const maxPct = clampPercent(valueToPercent(t.max, stats));
@@ -2718,19 +3162,19 @@
                         const stats = getBandStats(bandIdx);
                         const range = stats.max - stats.min;
                         if (range <= 0) {
-                            state.thresholds[bandIdx].min = stats.min;
-                            state.thresholds[bandIdx].max = stats.max;
+                            thresholds[bandIdx].min = stats.min;
+                            thresholds[bandIdx].max = stats.max;
                             updateSlider();
                             return;
                         }
                         const value = stats.min + pct * range;
                         const epsilon = Math.max(range * 0.002, 1e-6);
                         if (isMin) {
-                            const maxAllowed = state.thresholds[bandIdx].max - epsilon;
-                            state.thresholds[bandIdx].min = clampToBandRange(bandIdx, Math.min(value, maxAllowed));
+                            const maxAllowed = thresholds[bandIdx].max - epsilon;
+                            thresholds[bandIdx].min = clampToBandRange(bandIdx, Math.min(value, maxAllowed));
                         } else {
-                            const minAllowed = state.thresholds[bandIdx].min + epsilon;
-                            state.thresholds[bandIdx].max = clampToBandRange(bandIdx, Math.max(value, minAllowed));
+                            const minAllowed = thresholds[bandIdx].min + epsilon;
+                            thresholds[bandIdx].max = clampToBandRange(bandIdx, Math.max(value, minAllowed));
                         }
                         updateSlider();
                         applyThresholdHighlight();
@@ -2755,11 +3199,11 @@
                         const epsilon = Math.max(range * 0.002, 1e-6);
                         val = clampToBandRange(bandIdx, val);
                         if (isMin) {
-                            const maxAllowed = state.thresholds[bandIdx].max - epsilon;
-                            state.thresholds[bandIdx].min = Math.min(val, maxAllowed);
+                            const maxAllowed = thresholds[bandIdx].max - epsilon;
+                            thresholds[bandIdx].min = Math.min(val, maxAllowed);
                         } else {
-                            const minAllowed = state.thresholds[bandIdx].min + epsilon;
-                            state.thresholds[bandIdx].max = Math.max(val, minAllowed);
+                            const minAllowed = thresholds[bandIdx].min + epsilon;
+                            thresholds[bandIdx].max = Math.max(val, minAllowed);
                         }
                         updateSlider();
                         applyThresholdHighlight();
@@ -2780,8 +3224,51 @@
             const ctx = el.overlayCanvas.getContext('2d');
             ctx.clearRect(0, 0, el.overlayCanvas.width, el.overlayCanvas.height);
 
-            const bands = Object.keys(state.thresholds).map(Number);
-            if (bands.length === 0) {
+            if (!state.booleanMode) {
+                const bands = Object.keys(state.thresholds).map(Number);
+                if (bands.length === 0) {
+                    el.matchingPixels.textContent = '--';
+                    el.matchingPercent.textContent = '--';
+                    return;
+                }
+
+                const imgData = ctx.createImageData(state.width, state.height);
+                let matchCount = 0;
+                const totalPixels = state.width * state.height;
+
+                for (let i = 0; i < totalPixels; i++) {
+                    let matches = true;
+                    for (const bandIdx of bands) {
+                        const val = state.rasterData[bandIdx][i];
+                        const t = state.thresholds[bandIdx];
+                        if (val < t.min || val > t.max) {
+                            matches = false;
+                            break;
+                        }
+                    }
+                    if (matches) {
+                        imgData.data[i * 4] = 251;
+                        imgData.data[i * 4 + 1] = 191;
+                        imgData.data[i * 4 + 2] = 36;
+                        imgData.data[i * 4 + 3] = Math.round(state.maskOpacity * 255);
+                        matchCount++;
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+                el.matchingPixels.textContent = matchCount.toLocaleString();
+                el.matchingPercent.textContent = ((matchCount / totalPixels) * 100).toFixed(2) + '%';
+                return;
+            }
+
+            const rule1 = state.rules && state.rules[0] ? state.rules[0] : { enabled: false, thresholds: {} };
+            const rule2 = state.rules && state.rules[1] ? state.rules[1] : { enabled: false, thresholds: {} };
+            const rule1Bands = Object.keys(rule1.thresholds || {}).map(Number);
+            const rule2Bands = Object.keys(rule2.thresholds || {}).map(Number);
+            const rule1Valid = rule1.enabled && rule1Bands.length > 0;
+            const rule2Valid = rule2.enabled && rule2Bands.length > 0;
+
+            if (!rule1Valid && !rule2Valid) {
                 el.matchingPixels.textContent = '--';
                 el.matchingPercent.textContent = '--';
                 return;
@@ -2791,17 +3278,29 @@
             let matchCount = 0;
             const totalPixels = state.width * state.height;
 
-            for (let i = 0; i < totalPixels; i++) {
-                let matches = true;
+            const evaluateRule = (bands, thresholds, idx) => {
                 for (const bandIdx of bands) {
-                    const val = state.rasterData[bandIdx][i];
-                    const t = state.thresholds[bandIdx];
-                    if (val < t.min || val > t.max) {
-                        matches = false;
-                        break;
-                    }
+                    const val = state.rasterData[bandIdx][idx];
+                    const t = thresholds[bandIdx];
+                    if (val < t.min || val > t.max) return false;
                 }
-                if (matches) {
+                return true;
+            };
+
+            for (let i = 0; i < totalPixels; i++) {
+                const r1Match = rule1Valid ? evaluateRule(rule1Bands, rule1.thresholds, i) : false;
+                const r2Match = rule2Valid ? evaluateRule(rule2Bands, rule2.thresholds, i) : false;
+                let finalMatch = false;
+
+                if (rule1Valid && rule2Valid) {
+                    finalMatch = r1Match || r2Match;
+                } else if (rule1Valid) {
+                    finalMatch = r1Match;
+                } else if (rule2Valid) {
+                    finalMatch = r2Match;
+                }
+
+                if (finalMatch) {
                     imgData.data[i * 4] = 251;
                     imgData.data[i * 4 + 1] = 191;
                     imgData.data[i * 4 + 2] = 36;
@@ -2817,6 +3316,18 @@
 
         document.getElementById('clearFiltersBtn').addEventListener('click', () => {
             state.thresholds = {};
+            state.booleanMode = false;
+            if (state.rules && state.rules.length) {
+                state.rules.forEach(r => {
+                    if (r) {
+                        r.thresholds = {};
+                        r.enabled = true;
+                        r.collapsed = false;
+                    }
+                });
+                state.ruleOp = 'OR';
+                state.activeRuleIndex = 0;
+            }
             resetFilterUI();
             updateFilterPanel();
             updateBandList();
