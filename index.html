@@ -934,6 +934,34 @@
             background: rgba(59, 130, 246, 0.12);
         }
 
+        .content-wrapper {
+            position: relative;
+        }
+
+        .page-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 17, 23, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+
+        .page-loading-overlay.hidden {
+            display: none;
+        }
+
+        .page-loading-overlay .loading-text {
+            margin-top: 10px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
         footer {
             margin-top: 24px;
             padding: 16px 0 8px;
@@ -977,9 +1005,15 @@
             </div>
         </header>
 
-        <!-- RGB Controls -->
-        <div class="section-title">Visualization Controls</div>
-        <div class="control-bar">
+        <div class="content-wrapper" id="mainContent">
+            <div class="page-loading-overlay" id="pageLoadingOverlay">
+                <div class="spinner"></div>
+                <div class="loading-text" id="pageLoadingText">Loading demo image...</div>
+            </div>
+
+            <!-- RGB Controls -->
+            <div class="section-title">Visualization Controls</div>
+            <div class="control-bar">
             <div class="control-group">
                 <span class="color-dot r"></span>
                 <label>R</label>
@@ -1026,13 +1060,13 @@
                     <button class="tool-btn" id="zoomOutBtn" title="Zoom Out">−</button>
                     <button class="tool-btn" id="zoomResetBtn" title="Reset">⊡</button>
                     <div class="toolbar-group">
-                        <label>Window:</label>
+                        <label>Window Size:</label>
                         <select id="windowSize">
-                            <option value="1">1×1</option>
                             <option value="5">5×5</option>
-                            <option value="11" selected>11×11</option>
-                            <option value="21">21×21</option>
-                            <option value="51">51×51</option>
+                            <option value="10">10×10</option>
+                            <option value="20" selected>20×20</option>
+                            <option value="50">50×50</option>
+                            <option value="100">100×100</option>
                         </select>
                     </div>
                     <div class="opacity-group">
@@ -1088,12 +1122,10 @@
                         <span class="stat-label">Coverage:</span>
                         <span class="stat-value" id="matchingPercent">--</span>
                     </div>
-                    <div class="stat-row" style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span class="stat-label">Mask Opacity:</span>
-                            <span class="stat-value" id="maskOpacityVal" style="min-width: 35px; text-align: right;">70%</span>
-                        </div>
-                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="width: 100%;">
+                    <div class="stat-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                        <span class="stat-label">Mask Opacity:</span>
+                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="flex: 1;">
+                        <span class="stat-value" id="maskOpacityVal" style="min-width: 35px;">70%</span>
                     </div>
                 </div>
                 <div class="export-row">
@@ -1101,7 +1133,7 @@
                 </div>
                 <div class="loading-overlay hidden" id="filterLoading">
                     <div class="spinner"></div>
-                    <div class="loading-text" id="filterLoadingText">Loading preset filters...</div>
+                    <div class="loading-text" id="filterLoadingText">Loading presets...</div>
                 </div>
             </div>
         </div>
@@ -1240,6 +1272,7 @@
                 </div>
             </div>
         </div>
+        </div>
         <footer>
             Quintin Tyree | <a href="mailto:tyreespatial@gmail.com">tyreespatial@gmail.com</a>
         </footer>
@@ -1265,27 +1298,6 @@
             ]
         };
 
-        const PRESET_FILTERS = [
-            {
-                id: 'water',
-                name: 'Water',
-                description: 'General water signature preset',
-                entries: [
-                    { match: 'Blue', center: 490, min: 0.0051, max: 0.0932 },
-                    { match: 'Red Edge', center: 705, min: 0.0049, max: 0.0483 }
-                ]
-            },
-            {
-                id: 'vegetation',
-                name: 'Vegetation',
-                description: 'Healthy vegetation reflectance preset',
-                entries: [
-                    { match: 'Red', center: 665, min: 0.0200, max: 0.1500 },
-                    { match: 'NIR', center: 865, min: 0.1800, max: 0.7200 }
-                ]
-            }
-        ];
-
         // Image-specific threshold filter presets
         const IMAGE_SPECIFIC_PRESETS = {
             'California Farmland': [
@@ -1302,7 +1314,7 @@
                     entries: [
                         { match: 'Red', center: 665, min: 0.0000, max: 0.0276 },
                         { match: 'NIR', center: 865, min: 0.0850, max: 0.7000 },
-                        { match: 'Red Edge', center: 705, min: 0.0000, max: 0.0550 }
+                        { match: 'Red Edge', center: 705, min: 0.0002, max: 0.0550 }
                     ]
                 }
             ],
@@ -1371,7 +1383,8 @@
                     description: 'Coastal Wetlands- Tide Dependant',
                     entries: [
                         { match: 'NIR', center: 865, min: 0.0664, max: 0.2284 },
-                        { match: 'Red', center: 665, min: 0.0000, max: 0.1345 }                    ]
+                        { match: 'Red', center: 665, min: 0.0000, max: 0.1345 }
+                    ]
                 }
             ],
             'Northeast Lakes': [
@@ -1387,6 +1400,7 @@
                     description: 'Buildings and roads',
                     entries: [
                         { match: 'Red', center: 665, min: 0.0708, max: 0.5896 }
+                    ]
                 }
             ],
             'Ohio Farmland': [
@@ -1486,7 +1500,9 @@
             cloudImageList: [],
             sampleFormat: '',
             currentImageLabel: 'N/A',
-            filterMode: 'custom'
+            filterMode: 'custom',
+            isDataLoading: false,
+            isVizUpdating: false
         };
 
         const el = {
@@ -1499,6 +1515,8 @@
             loadingText: document.getElementById('loadingText'),
             filterLoading: document.getElementById('filterLoading'),
             filterLoadingText: document.getElementById('filterLoadingText'),
+            pageOverlay: document.getElementById('pageLoadingOverlay'),
+            pageOverlayText: document.getElementById('pageLoadingText'),
             mapInfo: document.getElementById('mapInfo'),
             sampleMarker: document.getElementById('sampleMarker'),
             samplePos: document.getElementById('samplePos'),
@@ -1544,6 +1562,67 @@
             methodsBtn: document.getElementById('methodsBtn'),
             exportBtn: document.getElementById('exportBtn')
         };
+
+        function beginGlobalLoading(message = 'Loading image...') {
+            state.isDataLoading = true;
+            if (el.loadingText) el.loadingText.textContent = message;
+            if (el.loading) el.loading.classList.remove('hidden');
+        }
+
+        function endGlobalLoading() {
+            state.isDataLoading = false;
+            if (!state.isVizUpdating && el.loading) {
+                el.loading.classList.add('hidden');
+            }
+        }
+
+        function beginVisualizationUpdate(message = 'Applying visualization changes...') {
+            if (state.isVizUpdating) return;
+            state.isVizUpdating = true;
+            if (!state.isDataLoading && el.loading) {
+                if (el.loadingText) el.loadingText.textContent = message;
+                el.loading.classList.remove('hidden');
+            }
+        }
+
+        function endVisualizationUpdate() {
+            if (!state.isVizUpdating) return;
+            state.isVizUpdating = false;
+            if (!state.isDataLoading && el.loading) {
+                el.loading.classList.add('hidden');
+            }
+        }
+
+        function showFilterLoading(message = 'Loading presets...') {
+            if (el.filterLoadingText) el.filterLoadingText.textContent = message;
+            if (el.filterLoading) el.filterLoading.classList.remove('hidden');
+        }
+
+        function hideFilterLoading() {
+            if (el.filterLoading) el.filterLoading.classList.add('hidden');
+        }
+
+        function showPageOverlay(message = 'Loading...') {
+            if (el.pageOverlayText) el.pageOverlayText.textContent = message;
+            if (el.pageOverlay) el.pageOverlay.classList.remove('hidden');
+        }
+
+        function hidePageOverlay() {
+            if (el.pageOverlay) el.pageOverlay.classList.add('hidden');
+        }
+
+        function prepareFiltersForNewImage() {
+            resetFilterUI();
+            state.thresholds = {};
+            state.currentReflectance = [];
+            state.bandPositions = [];
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+            if (el.filterOptions) el.filterOptions.innerHTML = '';
+            showFilterLoading();
+        }
 
         // Tool selection
         el.sampleTool.addEventListener('click', () => {
@@ -1594,9 +1673,6 @@
             });
         }
 
-        // Initialize filter options
-        renderFilterOptions();
-
         document.getElementById('dataConfigHeader').addEventListener('click', () => {
             el.dataConfigContent.classList.toggle('open');
         });
@@ -1615,6 +1691,7 @@
                 const objects = await fetchAllCloudObjects();
                 if (objects.length === 0) {
                     el.cloudImageSelect.innerHTML = '<option value=\"\">No cloud images</option>';
+                    hideFilterLoading();
                     return;
                 }
                 state.cloudImageList = objects;
@@ -1624,6 +1701,7 @@
             } catch (err) {
                 console.error('Cloud list error:', err);
                 el.cloudImageSelect.innerHTML = '<option value=\"\">Cloud load failed</option>';
+                hideFilterLoading();
             }
         }
 
@@ -1670,21 +1748,25 @@
         });
 
         async function loadFromFile(file) {
-            el.loading.classList.remove('hidden');
-            el.loadingText.textContent = 'Reading file...';
+            beginGlobalLoading('Reading file...');
+            prepareFiltersForNewImage();
             try {
                 const buffer = await file.arrayBuffer();
                 await processGeoTIFF(buffer, file.name);
             } catch (err) {
                 console.error(err);
-                el.loadingText.textContent = `Error: ${err.message}`;
-                setTimeout(() => el.loading.classList.add('hidden'), 3000);
+                if (el.loadingText) el.loadingText.textContent = `Error: ${err.message}`;
+                setTimeout(() => {
+                    endGlobalLoading();
+                    hidePageOverlay();
+                }, 3000);
+                hideFilterLoading();
             }
         }
 
         async function loadImageFromPath(relativePath, labelOverride = null) {
-            el.loading.classList.remove('hidden');
-            el.loadingText.textContent = 'Loading image...';
+            beginGlobalLoading('Loading image...');
+            prepareFiltersForNewImage();
             try {
                 const response = await fetch(relativePath);
                 if (!response.ok) throw new Error(`Unable to fetch ${relativePath}`);
@@ -1696,8 +1778,12 @@
                 await processGeoTIFF(buffer, label);
             } catch (err) {
                 console.error(err);
-                el.loadingText.textContent = `Error: ${err.message}`;
-                setTimeout(() => el.loading.classList.add('hidden'), 3000);
+                if (el.loadingText) el.loadingText.textContent = `Error: ${err.message}`;
+                setTimeout(() => {
+                    endGlobalLoading();
+                    hidePageOverlay();
+                }, 3000);
+                hideFilterLoading();
             }
         }
 
@@ -1715,24 +1801,23 @@
         function renderFilterOptions() {
             if (!el.filterOptions) return;
 
-            // Create custom button
+            const container = document.createElement('div');
+            container.className = 'preset-buttons';
+
             const customBtn = document.createElement('button');
             customBtn.className = 'preset-button';
-            customBtn.textContent = 'Custom';
-            customBtn.style.fontWeight = 'bold';
+            customBtn.innerHTML = `
+                <strong>Custom Thresholds</strong><br>
+                <span style="font-size:0.7rem;color:var(--text-dim)">Select bands from the spectral chart</span>
+            `;
             customBtn.addEventListener('click', () => {
                 selectFilterMode('custom');
             });
-
-            const container = document.createElement('div');
-            container.className = 'preset-buttons';
             container.appendChild(customBtn);
 
-            // Check if current image has specific presets
             const imagePresets = IMAGE_SPECIFIC_PRESETS[state.currentImageLabel];
-            if (imagePresets) {
-                // Create preset buttons for this specific image
-                imagePresets.forEach((preset, index) => {
+            if (imagePresets && imagePresets.length) {
+                imagePresets.forEach(preset => {
                     const btn = document.createElement('button');
                     btn.className = 'preset-button';
                     btn.innerHTML = `
@@ -1749,6 +1834,7 @@
 
             el.filterOptions.innerHTML = '';
             el.filterOptions.appendChild(container);
+            hideFilterLoading();
         }
 
         function selectFilterMode(mode) {
@@ -1778,13 +1864,12 @@
             state.filterMode = 'custom';
         }
 
-        function applyPresetFilters(presetId) {
-            const preset = PRESET_FILTERS.find(p => p.id === presetId);
-            if (!preset) return;
+        function applyImagePreset(preset) {
             if (!state.bandInfo.length) {
                 alert('Load an image before applying presets.');
                 return;
             }
+
             const newThresholds = {};
             preset.entries.forEach(entry => {
                 const idx = findBandIndexForPreset(entry);
@@ -1795,54 +1880,17 @@
                     };
                 }
             });
+
             if (Object.keys(newThresholds).length === 0) {
                 alert('Preset bands not available in this image.');
                 return;
             }
+
             state.thresholds = newThresholds;
             updateFilterPanel();
             updateBandList();
             drawSpectralChart();
             applyThresholdHighlight();
-        }
-
-        function applyImagePreset(preset) {
-            if (!state.bandInfo.length) {
-                alert('Load an image before applying presets.');
-                return;
-            }
-
-            // Show loading spinner
-            el.filterLoading.classList.remove('hidden');
-
-            // Use setTimeout to allow UI to update
-            setTimeout(() => {
-                const newThresholds = {};
-                preset.entries.forEach(entry => {
-                    const idx = findBandIndexForPreset(entry);
-                    if (idx >= 0) {
-                        newThresholds[idx] = {
-                            min: clampToBandRange(idx, entry.min),
-                            max: clampToBandRange(idx, entry.max)
-                        };
-                    }
-                });
-
-                if (Object.keys(newThresholds).length === 0) {
-                    alert('Preset bands not available in this image.');
-                    el.filterLoading.classList.add('hidden');
-                    return;
-                }
-
-                state.thresholds = newThresholds;
-                updateFilterPanel();
-                updateBandList();
-                drawSpectralChart();
-                applyThresholdHighlight();
-
-                // Hide loading spinner
-                el.filterLoading.classList.add('hidden');
-            }, 50);
         }
 
         function findBandIndexForPreset(entry) {
@@ -1957,6 +2005,7 @@
 
             // Update filter options to show image-specific presets if available
             renderFilterOptions();
+            hideFilterLoading();
 
             renderImage();
             updateAnalysis();
@@ -1964,8 +2013,9 @@
             el.mapPlaceholder.style.display = 'none';
             el.mapInfo.style.display = 'block';
             el.dataConfig.classList.add('visible');
-            el.loading.classList.add('hidden');
             el.mainCanvas.className = state.tool === 'pan' ? 'pan-mode' : 'sample-mode';
+            endGlobalLoading();
+            hidePageOverlay();
         }
 
         function autoDetectScaleFactor(maxVal) {
@@ -2140,47 +2190,37 @@
         function renderImage() {
             if (!state.rasterData) return;
 
-            // Show loading spinner
-            el.loading.classList.remove('hidden');
-            el.loadingText.textContent = 'Rendering visualization...';
+            const ctx = el.mainCanvas.getContext('2d');
+            el.mainCanvas.width = state.width;
+            el.mainCanvas.height = state.height;
+            el.overlayCanvas.width = state.width;
+            el.overlayCanvas.height = state.height;
 
-            // Use setTimeout to allow UI to update
-            setTimeout(() => {
-                const ctx = el.mainCanvas.getContext('2d');
-                el.mainCanvas.width = state.width;
-                el.mainCanvas.height = state.height;
-                el.overlayCanvas.width = state.width;
-                el.overlayCanvas.height = state.height;
-
-                const getStretch = (band) => {
-                    const sorted = Float32Array.from(state.rasterData[band]).sort((a, b) => a - b);
-                    return {
-                        min: sorted[Math.floor(sorted.length * state.stretchMin / 100)],
-                        max: sorted[Math.floor(sorted.length * 0.98)]
-                    };
+            const getStretch = (band) => {
+                const sorted = Float32Array.from(state.rasterData[band]).sort((a, b) => a - b);
+                return {
+                    min: sorted[Math.floor(sorted.length * state.stretchMin / 100)],
+                    max: sorted[Math.floor(sorted.length * 0.98)]
                 };
+            };
 
-                const rS = getStretch(state.redBand);
-                const gS = getStretch(state.greenBand);
-                const bS = getStretch(state.blueBand);
+            const rS = getStretch(state.redBand);
+            const gS = getStretch(state.greenBand);
+            const bS = getStretch(state.blueBand);
 
-                const imgData = ctx.createImageData(state.width, state.height);
+            const imgData = ctx.createImageData(state.width, state.height);
 
-                for (let i = 0; i < state.width * state.height; i++) {
-                    imgData.data[i * 4] = stretch(state.rasterData[state.redBand][i], rS);
-                    imgData.data[i * 4 + 1] = stretch(state.rasterData[state.greenBand][i], gS);
-                    imgData.data[i * 4 + 2] = stretch(state.rasterData[state.blueBand][i], bS);
-                    imgData.data[i * 4 + 3] = 255;
-                }
+            for (let i = 0; i < state.width * state.height; i++) {
+                imgData.data[i * 4] = stretch(state.rasterData[state.redBand][i], rS);
+                imgData.data[i * 4 + 1] = stretch(state.rasterData[state.greenBand][i], gS);
+                imgData.data[i * 4 + 2] = stretch(state.rasterData[state.blueBand][i], bS);
+                imgData.data[i * 4 + 3] = 255;
+            }
 
-                ctx.putImageData(imgData, 0, 0);
-                applyThresholdHighlight();
-                updateCanvasTransform();
-                updateSampleMarker();
-
-                // Hide loading spinner
-                el.loading.classList.add('hidden');
-            }, 50);
+            ctx.putImageData(imgData, 0, 0);
+            applyThresholdHighlight();
+            updateCanvasTransform();
+            updateSampleMarker();
         }
 
         function stretch(v, s) {
@@ -2234,29 +2274,48 @@
         }
 
         // Debounce helper for smooth slider updates
-        let sliderDebounceTimer = null;
-        function debounceRender(delay = 300) {
-            if (sliderDebounceTimer) clearTimeout(sliderDebounceTimer);
-            sliderDebounceTimer = setTimeout(() => {
-                renderImage();
+        let visualizationDebounceTimer = null;
+        function scheduleVisualizationRender(delay = 300, message) {
+            beginVisualizationUpdate(message);
+            if (visualizationDebounceTimer) clearTimeout(visualizationDebounceTimer);
+            visualizationDebounceTimer = setTimeout(() => {
+                try {
+                    renderImage();
+                } finally {
+                    endVisualizationUpdate();
+                    visualizationDebounceTimer = null;
+                }
             }, delay);
         }
 
+        function triggerVisualizationRender(message) {
+            if (visualizationDebounceTimer) {
+                clearTimeout(visualizationDebounceTimer);
+                visualizationDebounceTimer = null;
+            }
+            beginVisualizationUpdate(message);
+            try {
+                renderImage();
+            } finally {
+                endVisualizationUpdate();
+            }
+        }
+
         // Controls
-        el.redBand.addEventListener('change', e => { state.redBand = +e.target.value; renderImage(); });
-        el.greenBand.addEventListener('change', e => { state.greenBand = +e.target.value; renderImage(); });
-        el.blueBand.addEventListener('change', e => { state.blueBand = +e.target.value; renderImage(); });
+        el.redBand.addEventListener('change', e => { state.redBand = +e.target.value; triggerVisualizationRender(); });
+        el.greenBand.addEventListener('change', e => { state.greenBand = +e.target.value; triggerVisualizationRender(); });
+        el.blueBand.addEventListener('change', e => { state.blueBand = +e.target.value; triggerVisualizationRender(); });
 
         el.stretchMin.addEventListener('input', e => {
             state.stretchMin = +e.target.value;
             el.stretchMinVal.textContent = state.stretchMin + '%';
-            debounceRender();
+            scheduleVisualizationRender();
         });
 
         el.gamma.addEventListener('input', e => {
             state.gamma = +e.target.value;
             el.gammaVal.textContent = state.gamma.toFixed(1);
-            debounceRender();
+            scheduleVisualizationRender();
         });
 
         if (el.imageOpacity) {
@@ -2297,7 +2356,7 @@
                     el.redBand.value = state.redBand;
                     el.greenBand.value = state.greenBand;
                     el.blueBand.value = state.blueBand;
-                    renderImage();
+                    scheduleVisualizationRender(100, 'Applying visualization preset...');
                 }
             });
         });
@@ -2774,6 +2833,8 @@
         });
 
         updateImageOpacity();
+        showFilterLoading();
+        showPageOverlay('Loading demo image...');
         initCloudImageList();
     </script>
 </body>
