@@ -1196,6 +1196,119 @@
             }
         ];
 
+        // Image-specific threshold filter presets
+        const IMAGE_SPECIFIC_PRESETS = {
+            'California Farmland': [
+                {
+                    name: 'Vegetation Health',
+                    description: 'Healthy crop detection',
+                    entries: [
+                        { match: 'Red', center: 665, min: 0.0250, max: 0.1200 },
+                        { match: 'NIR', center: 865, min: 0.2000, max: 0.6500 }
+                    ]
+                },
+                {
+                    name: 'Soil Moisture',
+                    description: 'Irrigation monitoring',
+                    entries: [
+                        { match: 'SWIR', center: 1610, min: 0.1000, max: 0.4000 },
+                        { match: 'NIR', center: 865, min: 0.1500, max: 0.5000 }
+                    ]
+                }
+            ],
+            'Grand Prismatic': [
+                {
+                    name: 'Thermal Features',
+                    description: 'Hot spring signature',
+                    entries: [
+                        { match: 'Blue', center: 490, min: 0.0100, max: 0.1500 },
+                        { match: 'Green', center: 560, min: 0.0200, max: 0.2000 },
+                        { match: 'Red', center: 665, min: 0.0300, max: 0.2500 }
+                    ]
+                },
+                {
+                    name: 'Microbial Mats',
+                    description: 'Colorful bacterial growth',
+                    entries: [
+                        { match: 'Green', center: 560, min: 0.0500, max: 0.3000 },
+                        { match: 'NIR', center: 865, min: 0.0200, max: 0.1500 }
+                    ]
+                }
+            ],
+            'Massachusetts Coastline': [
+                {
+                    name: 'Coastal Water',
+                    description: 'Ocean and bay detection',
+                    entries: [
+                        { match: 'Blue', center: 490, min: 0.0080, max: 0.1200 },
+                        { match: 'Green', center: 560, min: 0.0100, max: 0.1400 }
+                    ]
+                },
+                {
+                    name: 'Vegetation vs Beach',
+                    description: 'Land cover separation',
+                    entries: [
+                        { match: 'NIR', center: 865, min: 0.0500, max: 0.3000 },
+                        { match: 'Red', center: 665, min: 0.0200, max: 0.1500 }
+                    ]
+                }
+            ],
+            'Northeast Lakes': [
+                {
+                    name: 'Water Quality',
+                    description: 'Lake clarity assessment',
+                    entries: [
+                        { match: 'Blue', center: 490, min: 0.0050, max: 0.0900 },
+                        { match: 'Red Edge', center: 705, min: 0.0040, max: 0.0500 }
+                    ]
+                },
+                {
+                    name: 'Algae Detection',
+                    description: 'Phytoplankton presence',
+                    entries: [
+                        { match: 'Green', center: 560, min: 0.0150, max: 0.1200 },
+                        { match: 'Red Edge', center: 705, min: 0.0100, max: 0.0800 }
+                    ]
+                }
+            ],
+            'Ohio Farmland': [
+                {
+                    name: 'Crop Vigor',
+                    description: 'Agricultural health',
+                    entries: [
+                        { match: 'Red', center: 665, min: 0.0300, max: 0.1400 },
+                        { match: 'NIR', center: 865, min: 0.1500, max: 0.7000 }
+                    ]
+                },
+                {
+                    name: 'Bare Soil',
+                    description: 'Exposed field areas',
+                    entries: [
+                        { match: 'Red', center: 665, min: 0.1200, max: 0.3000 },
+                        { match: 'SWIR', center: 1610, min: 0.2000, max: 0.5000 }
+                    ]
+                }
+            ],
+            'Yellowstone Lake': [
+                {
+                    name: 'Deep Water',
+                    description: 'Lake depth indicator',
+                    entries: [
+                        { match: 'Blue', center: 490, min: 0.0060, max: 0.1000 },
+                        { match: 'Green', center: 560, min: 0.0100, max: 0.1500 }
+                    ]
+                },
+                {
+                    name: 'Shallow/Sediment',
+                    description: 'Nearshore areas',
+                    entries: [
+                        { match: 'Red', center: 665, min: 0.0500, max: 0.2000 },
+                        { match: 'NIR', center: 865, min: 0.0300, max: 0.1500 }
+                    ]
+                }
+            ]
+        };
+
         const GCS_BUCKET = 'general_research_bucket';
         const GCS_PREFIX = 'Spectral_app_images/';
         const GCS_LIST_ENDPOINT = `https://storage.googleapis.com/storage/v1/b/${GCS_BUCKET}/o?prefix=${encodeURIComponent(GCS_PREFIX)}`;
@@ -1451,26 +1564,28 @@
                 selectFilterMode('custom');
             });
 
-            // Create preset buttons
-            const presetButtons = PRESET_FILTERS.map(preset => {
-                const btn = document.createElement('button');
-                btn.className = 'preset-button';
-                btn.dataset.preset = preset.id;
-                btn.innerHTML = `
-                    <strong>${preset.name}</strong><br>
-                    <span style="font-size:0.7rem;color:var(--text-dim)">${preset.description}</span>
-                `;
-                btn.addEventListener('click', () => {
-                    selectFilterMode('preset');
-                    applyPresetFilters(preset.id);
-                });
-                return btn;
-            });
-
             const container = document.createElement('div');
             container.className = 'preset-buttons';
             container.appendChild(customBtn);
-            presetButtons.forEach(btn => container.appendChild(btn));
+
+            // Check if current image has specific presets
+            const imagePresets = IMAGE_SPECIFIC_PRESETS[state.currentImageLabel];
+            if (imagePresets) {
+                // Create preset buttons for this specific image
+                imagePresets.forEach((preset, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'preset-button';
+                    btn.innerHTML = `
+                        <strong>${preset.name}</strong><br>
+                        <span style="font-size:0.7rem;color:var(--text-dim)">${preset.description}</span>
+                    `;
+                    btn.addEventListener('click', () => {
+                        selectFilterMode('preset');
+                        applyImagePreset(preset);
+                    });
+                    container.appendChild(btn);
+                });
+            }
 
             el.filterOptions.innerHTML = '';
             el.filterOptions.appendChild(container);
@@ -1524,6 +1639,35 @@
                 alert('Preset bands not available in this image.');
                 return;
             }
+            state.thresholds = newThresholds;
+            updateFilterPanel();
+            updateBandList();
+            drawSpectralChart();
+            applyThresholdHighlight();
+        }
+
+        function applyImagePreset(preset) {
+            if (!state.bandInfo.length) {
+                alert('Load an image before applying presets.');
+                return;
+            }
+
+            const newThresholds = {};
+            preset.entries.forEach(entry => {
+                const idx = findBandIndexForPreset(entry);
+                if (idx >= 0) {
+                    newThresholds[idx] = {
+                        min: clampToBandRange(idx, entry.min),
+                        max: clampToBandRange(idx, entry.max)
+                    };
+                }
+            });
+
+            if (Object.keys(newThresholds).length === 0) {
+                alert('Preset bands not available in this image.');
+                return;
+            }
+
             state.thresholds = newThresholds;
             updateFilterPanel();
             updateBandList();
@@ -1637,6 +1781,12 @@
             state.imageOpacity = 1;
             if (el.imageOpacity) el.imageOpacity.value = '1';
             updateImageOpacity();
+
+            // Reset filter UI to initial state
+            resetFilterUI();
+
+            // Update filter options to show image-specific presets if available
+            renderFilterOptions();
 
             renderImage();
             updateAnalysis();
