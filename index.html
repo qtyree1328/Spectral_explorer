@@ -167,6 +167,30 @@
             text-transform: uppercase;
         }
 
+        .info-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            transition: all 0.2s;
+            margin-left: auto;
+        }
+
+        .info-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
         .control-group select {
             padding: 5px 8px;
             background: var(--bg-input);
@@ -267,6 +291,7 @@
             border-radius: 8px;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         /* Map Toolbar */
@@ -980,6 +1005,7 @@
                 <input type="range" id="gamma" min="0.3" max="2.5" value="1" step="0.1">
                 <span class="slider-value" id="gammaVal">1.0</span>
             </div>
+            <button class="info-btn" id="visualizationInfoBtn" title="Learn about visualization controls">ⓘ</button>
             <div class="preset-btns">
                 <button class="preset-btn" data-preset="truecolor">True Color</button>
                 <button class="preset-btn" data-preset="falsecolor">False Color</button>
@@ -1062,14 +1088,20 @@
                         <span class="stat-label">Coverage:</span>
                         <span class="stat-value" id="matchingPercent">--</span>
                     </div>
-                    <div class="stat-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-                        <span class="stat-label">Mask Opacity:</span>
-                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="flex: 1;">
-                        <span class="stat-value" id="maskOpacityVal" style="min-width: 35px;">70%</span>
+                    <div class="stat-row" style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="stat-label">Mask Opacity:</span>
+                            <span class="stat-value" id="maskOpacityVal" style="min-width: 35px; text-align: right;">70%</span>
+                        </div>
+                        <input type="range" id="maskOpacity" min="0" max="1" value="0.7" step="0.05" style="width: 100%;">
                     </div>
                 </div>
                 <div class="export-row">
                     <button class="export-btn" id="exportBtn">⬇️ Export Report</button>
+                </div>
+                <div class="loading-overlay hidden" id="filterLoading">
+                    <div class="spinner"></div>
+                    <div class="loading-text" id="filterLoadingText">Loading preset filters...</div>
                 </div>
             </div>
         </div>
@@ -1148,6 +1180,64 @@
                     <p><strong>Calibrated Range:</strong> <span id="reflectanceRange">--</span> (unitless surface reflectance)</p>
                     <p><strong>Precision:</strong> 1 DN ≈ <span id="precisionInfo">--</span> reflectance units</p>
                 </div>
+
+                <div class="visualization-control-section" id="visualizationControlSection">
+                    <h4 style="color: var(--accent); font-size: 0.95rem; margin-top: 20px; margin-bottom: 12px;">📊 Visualization Control</h4>
+
+                    <div style="margin-bottom: 18px;">
+                        <h5 style="color: var(--text); font-size: 0.85rem; margin-bottom: 8px;">RGB Band Assignment</h5>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            Multispectral satellite imagery contains many spectral bands beyond what the human eye can see. To visualize this data, we assign three bands to the Red, Green, and Blue channels of your display. This creates a composite image where each pixel's color represents the reflectance values across those three bands.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>True Color:</strong> Uses visible bands (Red → R, Green → G, Blue → B) to approximate natural appearance.<br>
+                            <strong>False Color:</strong> Uses non-visible bands (e.g., NIR → R) to reveal patterns invisible to the eye, such as vegetation health or water content.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 18px;">
+                        <h5 style="color: var(--text); font-size: 0.85rem; margin-bottom: 8px;">Linear Contrast Stretch</h5>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            Raw reflectance values often occupy only a small portion of the possible display range (0-255). Contrast stretching enhances image visibility by remapping the data distribution to use the full dynamic range.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>Type:</strong> This tool uses a <strong>linear (min-max) stretch</strong> rather than non-linear alternatives like histogram equalization or standard deviation stretches. The linear approach preserves the relative relationships between pixel values while enhancing contrast.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>Method:</strong> The stretch slider sets the lower percentile clip (default 2%). Values below this percentile are mapped to 0 (black), while values above the 98th percentile are mapped to 255 (white). This linear transformation improves contrast by eliminating extreme outliers while maintaining the linear relationship between reflectance values.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>Formula:</strong> <code>stretched = (value - min) / (max - min) × 255</code><br>
+                            where min and max are the specified percentile values for each band independently.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 18px;">
+                        <h5 style="color: var(--text); font-size: 0.85rem; margin-bottom: 8px;">Gamma Correction (Non-Linear)</h5>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            Gamma correction is a <strong>non-linear transformation</strong> that adjusts image brightness without changing the endpoints. It compensates for the non-linear relationship between pixel values and perceived brightness, making it complementary to the linear stretch.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>Method:</strong> After linear contrast stretching, normalized values (0-1) are raised to the power of 1/gamma. A gamma > 1 brightens mid-tones (revealing dark features), while gamma < 1 darkens mid-tones (enhancing bright features). Unlike the linear stretch, this applies a power function that disproportionately affects mid-range values.
+                        </p>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            <strong>Formula:</strong> <code>corrected = normalized<sup>(1/γ)</sup></code><br>
+                            Default γ = 1.0 (no correction, linear passthrough). Range: 0.3 (darken) to 2.5 (brighten).
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <h5 style="color: var(--text); font-size: 0.85rem; margin-bottom: 8px;">Combined Pipeline</h5>
+                        <p style="font-size: 0.8rem; line-height: 1.6; color: var(--text-muted);">
+                            Each pixel undergoes this transformation sequence:<br>
+                            <strong>1.</strong> Select reflectance value from chosen band<br>
+                            <strong>2.</strong> Apply percentile-based <strong>linear</strong> contrast stretch<br>
+                            <strong>3.</strong> Apply <strong>non-linear</strong> gamma correction<br>
+                            <strong>4.</strong> Scale to 0-255 for display<br>
+                            This process is applied independently to R, G, and B channels, then combined to produce the final composite image. The combination of linear stretch (for contrast) and non-linear gamma (for brightness) provides flexible control over image appearance.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
         <footer>
@@ -1200,37 +1290,52 @@
         const IMAGE_SPECIFIC_PRESETS = {
             'California Farmland': [
                 {
-                    name: 'Vegetation Health',
-                    description: 'Healthy crop detection',
+                    name: 'Water',
+                    description: 'River detection',
                     entries: [
-                        { match: 'Red', center: 665, min: 0.0250, max: 0.1200 },
-                        { match: 'NIR', center: 865, min: 0.2000, max: 0.6500 }
+                        { match: 'NIR', center: 865, min: 0.0000, max: 0.0353 }
                     ]
                 },
                 {
-                    name: 'Soil Moisture',
-                    description: 'Irrigation monitoring',
+                    name: 'Active Agriculture',
+                    description: 'Active agriculture in california',
                     entries: [
-                        { match: 'SWIR', center: 1610, min: 0.1000, max: 0.4000 },
-                        { match: 'NIR', center: 865, min: 0.1500, max: 0.5000 }
+                        { match: 'Red', center: 665, min: 0.0000, max: 0.0276 },
+                        { match: 'NIR', center: 865, min: 0.0850, max: 0.7000 },
+                        { match: 'Red Edge', center: 705, min: 0.0000, max: 0.0550 }
                     ]
                 }
             ],
             'Grand Prismatic': [
                 {
-                    name: 'Thermal Features',
+                    name: 'Geyserite- silica deposit',
                     description: 'Hot spring signature',
                     entries: [
-                        { match: 'Blue', center: 490, min: 0.0100, max: 0.1500 },
-                        { match: 'Green', center: 560, min: 0.0200, max: 0.2000 },
-                        { match: 'Red', center: 665, min: 0.0300, max: 0.2500 }
+                        { match: 'Green', center: 565, min: 0.1103, max: 0.4456 }
                     ]
                 },
+                {
+                    name: 'Water',
+                    description: 'Ponds and Rivers',
+                    entries: [
+                        { match: 'Green', center: 565, min: 0.0000, max: 0.0446 },
+                        { match: 'Red Edge', center: 705, min: 0.0000, max: 0.0576 }
+                    ]
+                },
+                {
+                    name: 'Forest',
+                    description: 'Forest and grassland',
+                    entries: [
+                        { match: 'Red', center: 665, min: 0.0000, max: 0.1424 },
+                        { match: 'Red Edge', center: 705, min: 0.0681, max: 0.4267 }
+                    ]
+                },
+
                 {
                     name: 'Microbial Mats',
                     description: 'Colorful bacterial growth',
                     entries: [
-                        { match: 'Green', center: 560, min: 0.0500, max: 0.3000 },
+                        { match: 'Green', center: 565, min: 0.0500, max: 0.3000 },
                         { match: 'NIR', center: 865, min: 0.0200, max: 0.1500 }
                     ]
                 }
@@ -1240,70 +1345,102 @@
                     name: 'Coastal Water',
                     description: 'Ocean and bay detection',
                     entries: [
-                        { match: 'Blue', center: 490, min: 0.0080, max: 0.1200 },
-                        { match: 'Green', center: 560, min: 0.0100, max: 0.1400 }
+                        { match: 'NIR', center: 865, min: 0.0000, max: 0.0457 }
                     ]
                 },
                 {
-                    name: 'Vegetation vs Beach',
-                    description: 'Land cover separation',
+                    name: 'Beach',
+                    description: 'Coastline Sand',
                     entries: [
-                        { match: 'NIR', center: 865, min: 0.0500, max: 0.3000 },
-                        { match: 'Red', center: 665, min: 0.0200, max: 0.1500 }
+                        { match: 'NIR', center: 865, min: 0.1869, max: 0.3779 },
+                        { match: 'Red', center: 665, min: 0.1826, max: 0.6487 },
+                        { match: 'Red Edge', center: 705, min: 0.1235, max: 0.6379 }
                     ]
+                },
+                {
+                    name: 'Vegetation',
+                    description: 'Agriculture and Forest',
+                    entries: [
+                        { match: 'NIR', center: 865, min: 0.2741, max: 0.8306 },
+                        { match: 'Red', center: 665, min: 0.0000, max: 0.0769 },
+                        { match: 'Red Edge', center: 705, min: 0.0000, max: 0.1921 }
+                    ]
+                },
+                {
+                    name: 'Wetland',
+                    description: 'Coastal Wetlands- Tide Dependant',
+                    entries: [
+                        { match: 'NIR', center: 865, min: 0.0664, max: 0.2284 },
+                        { match: 'Red', center: 665, min: 0.0000, max: 0.1345 }                    ]
                 }
             ],
             'Northeast Lakes': [
                 {
-                    name: 'Water Quality',
-                    description: 'Lake clarity assessment',
+                    name: 'Water Bodies',
+                    description: 'Active lakes and ponds',
                     entries: [
-                        { match: 'Blue', center: 490, min: 0.0050, max: 0.0900 },
-                        { match: 'Red Edge', center: 705, min: 0.0040, max: 0.0500 }
+                        { match: 'Red Edge', center: 705, min: 0.0040, max: 0.0859 }
                     ]
                 },
                 {
-                    name: 'Algae Detection',
-                    description: 'Phytoplankton presence',
+                    name: 'Infrastructure',
+                    description: 'Buildings and roads',
                     entries: [
-                        { match: 'Green', center: 560, min: 0.0150, max: 0.1200 },
-                        { match: 'Red Edge', center: 705, min: 0.0100, max: 0.0800 }
-                    ]
+                        { match: 'Red', center: 665, min: 0.0708, max: 0.5896 }
                 }
             ],
             'Ohio Farmland': [
                 {
-                    name: 'Crop Vigor',
-                    description: 'Agricultural health',
+                    name: 'Water',
+                    description: 'River and creeks',
                     entries: [
-                        { match: 'Red', center: 665, min: 0.0300, max: 0.1400 },
-                        { match: 'NIR', center: 865, min: 0.1500, max: 0.7000 }
+                        { match: 'Red Edge', center: 705, min: 0.0003, max: 0.0685 },
+                        { match: 'NIR', center: 865, min: 0.0000, max: 0.2354 }
                     ]
                 },
                 {
-                    name: 'Bare Soil',
-                    description: 'Exposed field areas',
+                    name: 'Industrials',
+                    description: 'Buildings and industrial areas',
                     entries: [
-                        { match: 'Red', center: 665, min: 0.1200, max: 0.3000 },
-                        { match: 'SWIR', center: 1610, min: 0.2000, max: 0.5000 }
+                        { match: 'Blue', center: 490, min: 0.0704, max: 0.5417 },
+                        { match: 'Red Edge', center: 705, min: 0.1211, max: 0.4569 }
+                    ]
+                },
+                {
+                    name: 'Farm Land',
+                    description: 'Farms',
+                    entries: [
+                        { match: 'Green', center: 565, min: 0.0562, max: 0.4899 },
+                        { match: 'Red Edge', center: 705, min: 0.0708, max: 0.2056 },
+                        { match: 'Green I', center: 531, min: 0.0482, max: 0.0936 }
                     ]
                 }
             ],
             'Yellowstone Lake': [
                 {
-                    name: 'Deep Water',
-                    description: 'Lake depth indicator',
+                    name: 'Lake',
+                    description: 'Lake',
                     entries: [
-                        { match: 'Blue', center: 490, min: 0.0060, max: 0.1000 },
-                        { match: 'Green', center: 560, min: 0.0100, max: 0.1500 }
+                        { match: 'Red Edge', center: 705, min: 0.0000, max: 0.0448 },
+                        { match: 'NIR', center: 865, min: 0.0022, max: 0.1206 }
                     ]
                 },
                 {
-                    name: 'Shallow/Sediment',
-                    description: 'Nearshore areas',
+                    name: 'Forest',
+                    description: 'Forested Areas',
                     entries: [
-                        { match: 'Red', center: 665, min: 0.0500, max: 0.2000 },
-                        { match: 'NIR', center: 865, min: 0.0300, max: 0.1500 }
+                        { match: 'Yellow', center: 610, min: 0.0025, max: 0.0408 },
+                        { match: 'NIR', center: 705, min: 0.0398, max: 0.1658 }
+                    ]
+                },
+                {
+                    name: 'Burned/dead Tree Stands',
+                    description: 'Burned pine trees',
+                    entries: [
+                        { match: 'Yellow', center: 610, min: 0.0433, max: 0.0958 },
+                        { match: 'NIR', center: 865, min: 0.0000, max: 0.2149 },
+                        { match: 'Red Edge', center: 705, min: 0.0531, max: 0.1036 }
+
                     ]
                 }
             ]
@@ -1360,6 +1497,8 @@
             mapPlaceholder: document.getElementById('mapPlaceholder'),
             loading: document.getElementById('loading'),
             loadingText: document.getElementById('loadingText'),
+            filterLoading: document.getElementById('filterLoading'),
+            filterLoadingText: document.getElementById('filterLoadingText'),
             mapInfo: document.getElementById('mapInfo'),
             sampleMarker: document.getElementById('sampleMarker'),
             samplePos: document.getElementById('samplePos'),
@@ -1426,6 +1565,27 @@
                 el.dataConfigContent.classList.add('open');
                 el.dataConfig.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
+        }
+
+        // Info button handler for visualization controls
+        const visualizationInfoBtn = document.getElementById('visualizationInfoBtn');
+        const visualizationControlSection = document.getElementById('visualizationControlSection');
+
+        function scrollToVisualizationControl() {
+            // Open the methods panel if it's closed
+            el.dataConfigContent.classList.add('open');
+
+            // Scroll to the methods panel first
+            el.dataConfig.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // After scrolling to methods panel, scroll to the visualization control section
+            setTimeout(() => {
+                visualizationControlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 300);
+        }
+
+        if (visualizationInfoBtn) {
+            visualizationInfoBtn.addEventListener('click', scrollToVisualizationControl);
         }
 
         if (el.exportBtn) {
@@ -1652,27 +1812,37 @@
                 return;
             }
 
-            const newThresholds = {};
-            preset.entries.forEach(entry => {
-                const idx = findBandIndexForPreset(entry);
-                if (idx >= 0) {
-                    newThresholds[idx] = {
-                        min: clampToBandRange(idx, entry.min),
-                        max: clampToBandRange(idx, entry.max)
-                    };
+            // Show loading spinner
+            el.filterLoading.classList.remove('hidden');
+
+            // Use setTimeout to allow UI to update
+            setTimeout(() => {
+                const newThresholds = {};
+                preset.entries.forEach(entry => {
+                    const idx = findBandIndexForPreset(entry);
+                    if (idx >= 0) {
+                        newThresholds[idx] = {
+                            min: clampToBandRange(idx, entry.min),
+                            max: clampToBandRange(idx, entry.max)
+                        };
+                    }
+                });
+
+                if (Object.keys(newThresholds).length === 0) {
+                    alert('Preset bands not available in this image.');
+                    el.filterLoading.classList.add('hidden');
+                    return;
                 }
-            });
 
-            if (Object.keys(newThresholds).length === 0) {
-                alert('Preset bands not available in this image.');
-                return;
-            }
+                state.thresholds = newThresholds;
+                updateFilterPanel();
+                updateBandList();
+                drawSpectralChart();
+                applyThresholdHighlight();
 
-            state.thresholds = newThresholds;
-            updateFilterPanel();
-            updateBandList();
-            drawSpectralChart();
-            applyThresholdHighlight();
+                // Hide loading spinner
+                el.filterLoading.classList.add('hidden');
+            }, 50);
         }
 
         function findBandIndexForPreset(entry) {
@@ -1970,37 +2140,47 @@
         function renderImage() {
             if (!state.rasterData) return;
 
-            const ctx = el.mainCanvas.getContext('2d');
-            el.mainCanvas.width = state.width;
-            el.mainCanvas.height = state.height;
-            el.overlayCanvas.width = state.width;
-            el.overlayCanvas.height = state.height;
+            // Show loading spinner
+            el.loading.classList.remove('hidden');
+            el.loadingText.textContent = 'Rendering visualization...';
 
-            const getStretch = (band) => {
-                const sorted = Float32Array.from(state.rasterData[band]).sort((a, b) => a - b);
-                return {
-                    min: sorted[Math.floor(sorted.length * state.stretchMin / 100)],
-                    max: sorted[Math.floor(sorted.length * 0.98)]
+            // Use setTimeout to allow UI to update
+            setTimeout(() => {
+                const ctx = el.mainCanvas.getContext('2d');
+                el.mainCanvas.width = state.width;
+                el.mainCanvas.height = state.height;
+                el.overlayCanvas.width = state.width;
+                el.overlayCanvas.height = state.height;
+
+                const getStretch = (band) => {
+                    const sorted = Float32Array.from(state.rasterData[band]).sort((a, b) => a - b);
+                    return {
+                        min: sorted[Math.floor(sorted.length * state.stretchMin / 100)],
+                        max: sorted[Math.floor(sorted.length * 0.98)]
+                    };
                 };
-            };
 
-            const rS = getStretch(state.redBand);
-            const gS = getStretch(state.greenBand);
-            const bS = getStretch(state.blueBand);
+                const rS = getStretch(state.redBand);
+                const gS = getStretch(state.greenBand);
+                const bS = getStretch(state.blueBand);
 
-            const imgData = ctx.createImageData(state.width, state.height);
+                const imgData = ctx.createImageData(state.width, state.height);
 
-            for (let i = 0; i < state.width * state.height; i++) {
-                imgData.data[i * 4] = stretch(state.rasterData[state.redBand][i], rS);
-                imgData.data[i * 4 + 1] = stretch(state.rasterData[state.greenBand][i], gS);
-                imgData.data[i * 4 + 2] = stretch(state.rasterData[state.blueBand][i], bS);
-                imgData.data[i * 4 + 3] = 255;
-            }
+                for (let i = 0; i < state.width * state.height; i++) {
+                    imgData.data[i * 4] = stretch(state.rasterData[state.redBand][i], rS);
+                    imgData.data[i * 4 + 1] = stretch(state.rasterData[state.greenBand][i], gS);
+                    imgData.data[i * 4 + 2] = stretch(state.rasterData[state.blueBand][i], bS);
+                    imgData.data[i * 4 + 3] = 255;
+                }
 
-            ctx.putImageData(imgData, 0, 0);
-            applyThresholdHighlight();
-            updateCanvasTransform();
-            updateSampleMarker();
+                ctx.putImageData(imgData, 0, 0);
+                applyThresholdHighlight();
+                updateCanvasTransform();
+                updateSampleMarker();
+
+                // Hide loading spinner
+                el.loading.classList.add('hidden');
+            }, 50);
         }
 
         function stretch(v, s) {
